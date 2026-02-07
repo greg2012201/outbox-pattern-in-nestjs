@@ -32,5 +32,5 @@ export class OutboxEvent extends BaseEntity {
   retryCount: number;
 
   @Column({ nullable: true })
+  processedAt: Date;
 }
-processedAt: Date;

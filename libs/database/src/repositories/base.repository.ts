@@ -12,11 +12,11 @@ export class BaseRepository<T> {
   }
 
   async create(data: Partial<T>): Promise<T> {
-    const entity = this.repository.create(data);
-    return this.repository.save(entity);
+    const entity = this.repository.create(data as any);
+    return (await this.repository.save(entity)) as T;
   }
 
-  async update(id: string, data: Partial<T>): Promise<T> {
+  async update(id: string, data: Partial<T>): Promise<T | null> {
     await this.repository.update(id, data as any);
     return this.findById(id);
   }
