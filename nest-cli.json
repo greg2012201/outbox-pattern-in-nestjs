@@ -8,7 +8,38 @@
     "api-gateway": {
       "type": "application",
       "root": "apps/api-gateway",
-      "entryFile": "main"
+      "entryFile": "main",
+      "sourceRoot": "apps/api-gateway/src"
+    },
+    "order-service": {
+      "type": "application",
+      "root": "apps/order-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/order-service/src"
+    },
+    "payment-service": {
+      "type": "application",
+      "root": "apps/payment-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/payment-service/src"
+    },
+    "notification-service": {
+      "type": "application",
+      "root": "apps/notification-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/notification-service/src"
+    },
+    "email-service": {
+      "type": "application",
+      "root": "apps/email-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/email-service/src"
+    },
+    "accounting-service": {
+      "type": "application",
+      "root": "apps/accounting-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/accounting-service/src"
     },
     "common": {
       "type": "library",

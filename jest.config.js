@@ -27,4 +27,14 @@ module.exports = {
     '^@app/auth$': '<rootDir>/libs/auth/src',
     '^@app/auth/(.*)$': '<rootDir>/libs/auth/src/$1',
   },
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    },
+  },
+  testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+  transformIgnorePatterns: ['/node_modules/(?!uuid)'],
 };
