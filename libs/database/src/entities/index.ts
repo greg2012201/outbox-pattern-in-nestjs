@@ -5,3 +5,5 @@ export * from './order.entity';
 export * from './order-item.entity';
 export * from './payment.entity';
 export * from './payment-attempt.entity';
+export * from './notification.entity';
+export * from './email.entity';
