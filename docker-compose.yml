@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: order_pass
       POSTGRES_DB: order_db
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - order_db_data:/var/lib/postgresql/data
     networks:
@@ -23,7 +23,7 @@ services:
       POSTGRES_PASSWORD: payment_pass
       POSTGRES_DB: payment_db
     ports:
-      - "5433:5432"
+      - '5433:5432'
     volumes:
       - payment_db_data:/var/lib/postgresql/data
     networks:
@@ -37,7 +37,7 @@ services:
       POSTGRES_PASSWORD: notification_pass
       POSTGRES_DB: notification_db
     ports:
-      - "5434:5432"
+      - '5434:5432'
     volumes:
       - notification_db_data:/var/lib/postgresql/data
     networks:
@@ -50,20 +50,10 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - '5672:5672'
+      - '15672:15672'
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - payment-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
     networks:
       - payment-network
 
@@ -72,7 +62,6 @@ volumes:
   payment_db_data:
   notification_db_data:
   rabbitmq_data:
-  redis_data:
 
 networks:
   payment-network:
