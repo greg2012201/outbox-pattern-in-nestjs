@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { Payment, PaymentAttempt, OutboxEvent, ProcessedEvent } from '@app/database/entities';
+import { ClientsModule } from '@nestjs/microservices';
+import { OutboxEvent, ProcessedEvent } from '@app/database';
+import { MessagingModule, getRabbitMQConfig } from '@app/messaging';
+import { Payment, PaymentAttempt } from './entities';
 import { PaymentService } from './services/payment.service';
 import { PaymentRepository } from './repositories/payment.repository';
 import { PaymentAttemptRepository } from './repositories/payment-attempt.repository';
-import { OutboxRepository } from './repositories/outbox.repository';
-import { ProcessedEventRepository } from './repositories/processed-event.repository';
 import { OrderCreatedConsumer } from './consumers/order-created.consumer';
-import { OutboxPublisherWorker } from './workers/outbox-publisher.worker';
 
 @Module({
   imports: [
@@ -18,26 +17,16 @@ import { OutboxPublisherWorker } from './workers/outbox-publisher.worker';
     ClientsModule.register([
       {
         name: 'PAYMENT_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URLS || 'amqp://localhost:5672'],
-          queue: 'payment_service_queue',
-          queueOptions: {
-            durable: true,
-          },
-        },
+        ...getRabbitMQConfig('payment_service_queue'),
       },
     ]),
+    MessagingModule.forProducer({
+      clientToken: 'PAYMENT_SERVICE',
+      patternTransformer: (eventType) => `payment.${eventType.toLowerCase()}`,
+    }),
+    MessagingModule.forConsumer(),
   ],
-  providers: [
-    PaymentService,
-    PaymentRepository,
-    PaymentAttemptRepository,
-    OutboxRepository,
-    ProcessedEventRepository,
-    OrderCreatedConsumer,
-    OutboxPublisherWorker,
-  ],
+  providers: [PaymentService, PaymentRepository, PaymentAttemptRepository, OrderCreatedConsumer],
   exports: [PaymentService, PaymentRepository],
 })
 export class PaymentServiceModule {}

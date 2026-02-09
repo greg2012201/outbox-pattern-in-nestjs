@@ -1,18 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { Payment, PaymentAttempt, OutboxEvent, PaymentStatus } from '@app/database/entities';
+import { Payment, PaymentAttempt, PaymentStatus } from '../entities';
 import { PaymentService } from './payment.service';
 import { PaymentRepository } from '../repositories/payment.repository';
 import { PaymentAttemptRepository } from '../repositories/payment-attempt.repository';
-import { OutboxRepository } from '../repositories/outbox.repository';
-import { ProcessedEventRepository } from '../repositories/processed-event.repository';
 
 describe('PaymentService', () => {
   let service: PaymentService;
   let paymentRepository: PaymentRepository;
   let paymentAttemptRepository: PaymentAttemptRepository;
-  let processedEventRepository: ProcessedEventRepository;
   let dataSource: DataSource;
 
   const mockQueryRunner = {
@@ -48,21 +45,6 @@ describe('PaymentService', () => {
           },
         },
         {
-          provide: OutboxRepository,
-          useValue: {
-            findPendingEvents: jest.fn(),
-            markAsSent: jest.fn(),
-            markAsFailed: jest.fn(),
-          },
-        },
-        {
-          provide: ProcessedEventRepository,
-          useValue: {
-            findProcessedEvent: jest.fn(),
-            markAsProcessed: jest.fn(),
-          },
-        },
-        {
           provide: getRepositoryToken(Payment),
           useValue: {
             findOne: jest.fn(),
@@ -76,13 +58,6 @@ describe('PaymentService', () => {
           },
         },
         {
-          provide: getRepositoryToken(OutboxEvent),
-          useValue: {
-            find: jest.fn(),
-            update: jest.fn(),
-          },
-        },
-        {
           provide: DataSource,
           useValue: mockDataSource,
         },
@@ -92,7 +67,6 @@ describe('PaymentService', () => {
     service = module.get<PaymentService>(PaymentService);
     paymentRepository = module.get<PaymentRepository>(PaymentRepository);
     paymentAttemptRepository = module.get<PaymentAttemptRepository>(PaymentAttemptRepository);
-    processedEventRepository = module.get<ProcessedEventRepository>(ProcessedEventRepository);
     dataSource = module.get<DataSource>(DataSource);
 
     jest.clearAllMocks();

@@ -1,5 +1,5 @@
 import { Column, Entity } from 'typeorm';
-import { BaseEntity } from './base.entity';
+import { BaseEntity } from '@app/database';
 
 export enum EmailStatus {
   PENDING = 'PENDING',

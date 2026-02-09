@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PaymentAttempt } from '@app/database/entities';
-import { BaseRepository } from '@app/database/repositories';
+import { PaymentAttempt } from '../entities';
+import { BaseRepository } from '@app/database';
 
 @Injectable()
 export class PaymentAttemptRepository extends BaseRepository<PaymentAttempt> {

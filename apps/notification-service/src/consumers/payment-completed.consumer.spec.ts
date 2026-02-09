@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentCompletedConsumer } from './payment-completed.consumer';
 import { NotificationService } from '../services/notification.service';
-import { ProcessedEventRepository } from '../repositories/processed-event.repository';
+import { ProcessedEventRepository } from '@app/messaging';
 
 describe('PaymentCompletedConsumer', () => {
   let consumer: PaymentCompletedConsumer;

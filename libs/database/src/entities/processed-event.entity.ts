@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Entity, PrimaryColumn } from 'typeorm';
 import { CreateDateColumn } from 'typeorm';
 
 @Entity('processed_events')

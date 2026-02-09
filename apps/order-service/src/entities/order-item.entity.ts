@@ -1,5 +1,5 @@
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
-import { BaseEntity } from './base.entity';
+import { BaseEntity } from '@app/database';
 import { Order } from './order.entity';
 
 @Entity('order_items')

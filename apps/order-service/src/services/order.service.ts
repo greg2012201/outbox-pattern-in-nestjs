@@ -1,22 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { Order, OutboxEvent } from '@app/database/entities';
+import { OutboxEvent } from '@app/database';
+import { Order } from '../entities';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { OrderDto } from '../dto/order.dto';
 import { OrderRepository } from '../repositories/order.repository';
-import { OutboxRepository } from '../repositories/outbox.repository';
 import { v4 as uuid } from 'uuid';
 
 @Injectable()
 export class OrderService {
   constructor(
     private readonly orderRepository: OrderRepository,
-    private readonly outboxRepository: OutboxRepository,
     @InjectRepository(Order)
     private ordersRepository: Repository<Order>,
-    @InjectRepository(OutboxEvent)
-    private outboxEventRepository: Repository<OutboxEvent>,
     private dataSource: DataSource
   ) {}
 

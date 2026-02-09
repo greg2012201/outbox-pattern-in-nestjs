@@ -1,10 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationService } from './notification.service';
 import { NotificationRepository } from '../repositories/notification.repository';
-import {
-  NotificationStatus,
-  NotificationType,
-} from '../../../../libs/database/src/entities/notification.entity';
+import { NotificationStatus, NotificationType } from '../entities';
 
 type MockNotificationRepository = Pick<NotificationRepository, 'findByEventId'> & {
   create: jest.Mock;

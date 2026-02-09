@@ -1,16 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { Order, OrderItem, OutboxEvent } from '@app/database/entities';
+import { Order, OrderItem } from '../entities';
 import { OrderService } from './order.service';
 import { OrderRepository } from '../repositories/order.repository';
-import { OutboxRepository } from '../repositories/outbox.repository';
 import { CreateOrderDto } from '../dto/create-order.dto';
 
 describe('OrderService', () => {
   let service: OrderService;
   let orderRepository: OrderRepository;
-  let outboxRepository: OutboxRepository;
   let dataSource: DataSource;
 
   const mockQueryRunner = {
@@ -34,20 +32,12 @@ describe('OrderService', () => {
       providers: [
         OrderService,
         OrderRepository,
-        OutboxRepository,
         {
           provide: getRepositoryToken(Order),
           useValue: {
             findOne: jest.fn(),
             find: jest.fn(),
             findAndCount: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(OutboxEvent),
-          useValue: {
-            find: jest.fn(),
-            update: jest.fn(),
           },
         },
         {
@@ -59,7 +49,6 @@ describe('OrderService', () => {
 
     service = module.get<OrderService>(OrderService);
     orderRepository = module.get<OrderRepository>(OrderRepository);
-    outboxRepository = module.get<OutboxRepository>(OutboxRepository);
     dataSource = module.get<DataSource>(DataSource);
   });
 

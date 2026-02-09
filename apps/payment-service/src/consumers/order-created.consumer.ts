@@ -1,7 +1,7 @@
 import { Controller, Logger } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { PaymentService } from '../services/payment.service';
-import { ProcessedEventRepository } from '../repositories/processed-event.repository';
+import { ProcessedEventRepository } from '@app/messaging';
 
 @Controller()
 export class OrderCreatedConsumer {

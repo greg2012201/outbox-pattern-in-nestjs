@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderCreatedConsumer } from './order-created.consumer';
 import { PaymentService } from '../services/payment.service';
-import { ProcessedEventRepository } from '../repositories/processed-event.repository';
+import { ProcessedEventRepository } from '@app/messaging';
 
 describe('OrderCreatedConsumer', () => {
   let consumer: OrderCreatedConsumer;

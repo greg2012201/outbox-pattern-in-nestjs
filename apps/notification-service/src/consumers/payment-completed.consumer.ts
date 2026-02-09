@@ -1,7 +1,7 @@
 import { Controller, Logger } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { NotificationService } from '../services/notification.service';
-import { ProcessedEventRepository } from '../repositories/processed-event.repository';
+import { ProcessedEventRepository, PaymentCompletedEvent } from '@app/messaging';
 
 @Controller()
 export class PaymentCompletedConsumer {
@@ -15,14 +15,7 @@ export class PaymentCompletedConsumer {
   @MessagePattern('payment.paymentcompleted')
   async handlePaymentCompleted(
     @Payload()
-    message: {
-      id: string;
-      paymentId: string;
-      orderId: string;
-      amount: number;
-      currency: string;
-      transactionId: string;
-    }
+    message: PaymentCompletedEvent & { id: string }
   ) {
     try {
       const consumerId = 'notification-service';

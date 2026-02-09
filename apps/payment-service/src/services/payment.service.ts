@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { Payment, PaymentAttempt, OutboxEvent, PaymentStatus } from '@app/database/entities';
+import { Payment, PaymentAttempt, PaymentStatus } from '../entities';
+import { OutboxEvent } from '@app/database';
 import { PaymentDto } from '../dto/payment.dto';
 import { PaymentRepository } from '../repositories/payment.repository';
 import { PaymentAttemptRepository } from '../repositories/payment-attempt.repository';
-import { OutboxRepository } from '../repositories/outbox.repository';
-import { ProcessedEventRepository } from '../repositories/processed-event.repository';
 import { v4 as uuid } from 'uuid';
 
 @Injectable()
@@ -16,14 +15,10 @@ export class PaymentService {
   constructor(
     private readonly paymentRepository: PaymentRepository,
     private readonly paymentAttemptRepository: PaymentAttemptRepository,
-    private readonly outboxRepository: OutboxRepository,
-    private readonly processedEventRepository: ProcessedEventRepository,
     @InjectRepository(Payment)
     private paymentsRepository: Repository<Payment>,
     @InjectRepository(PaymentAttempt)
     private paymentAttemptsRepository: Repository<PaymentAttempt>,
-    @InjectRepository(OutboxEvent)
-    private outboxEventRepository: Repository<OutboxEvent>,
     private dataSource: DataSource
   ) {}
 

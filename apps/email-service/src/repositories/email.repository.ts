@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Email } from '@app/database/entities';
-import { BaseRepository } from '@app/database/repositories';
+import { Email } from '../entities';
+import { BaseRepository } from '@app/database';
 
 @Injectable()
 export class EmailRepository extends BaseRepository<Email> {

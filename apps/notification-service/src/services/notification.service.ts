@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Notification, NotificationType, NotificationStatus } from '@app/database/entities';
+import { Notification, NotificationType, NotificationStatus } from '../entities';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { NotificationDto } from '../dto/notification.dto';
 import { v4 as uuid } from 'uuid';

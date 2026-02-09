@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Email, EmailStatus } from '@app/database/entities';
+import { Email, EmailStatus } from '../entities';
 import { EmailRepository } from '../repositories/email.repository';
 import { EmailDto } from '../dto/email.dto';
 import { v4 as uuid } from 'uuid';

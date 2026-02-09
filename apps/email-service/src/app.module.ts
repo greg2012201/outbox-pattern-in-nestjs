@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Email, ProcessedEvent } from '@app/database/entities';
+import { ProcessedEvent } from '@app/database';
+import { MessagingModule } from '@app/messaging';
+import { Email } from './entities';
 import { EmailService } from './services/email.service';
 import { EmailRepository } from './repositories/email.repository';
-import { ProcessedEventRepository } from './repositories/processed-event.repository';
 import { PaymentCompletedConsumer } from './consumers/payment-completed.consumer';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Email, ProcessedEvent])],
-  providers: [EmailService, EmailRepository, ProcessedEventRepository, PaymentCompletedConsumer],
+  imports: [TypeOrmModule.forFeature([Email, ProcessedEvent]), MessagingModule.forConsumer()],
+  providers: [EmailService, EmailRepository, PaymentCompletedConsumer],
   exports: [EmailService, EmailRepository],
 })
 export class EmailServiceModule {}

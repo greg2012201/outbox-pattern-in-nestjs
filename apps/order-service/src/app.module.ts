@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { Order, OrderItem, OutboxEvent } from '@app/database/entities';
+import { ClientsModule } from '@nestjs/microservices';
+import { OutboxEvent } from '@app/database';
+import { MessagingModule, getRabbitMQConfig } from '@app/messaging';
+import { Order, OrderItem } from './entities';
 import { OrderController } from './controllers/order.controller';
 import { OrderService } from './services/order.service';
 import { OrderRepository } from './repositories/order.repository';
-import { OutboxRepository } from './repositories/outbox.repository';
-import { OutboxPublisherWorker } from './workers/outbox-publisher.worker';
 
 @Module({
   imports: [
@@ -16,19 +16,16 @@ import { OutboxPublisherWorker } from './workers/outbox-publisher.worker';
     ClientsModule.register([
       {
         name: 'ORDER_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URLS || 'amqp://localhost:5672'],
-          queue: 'order_service_queue',
-          queueOptions: {
-            durable: true,
-          },
-        },
+        ...getRabbitMQConfig('order_service_queue'),
       },
     ]),
+    MessagingModule.forProducer({
+      clientToken: 'ORDER_SERVICE',
+      patternTransformer: (eventType) => eventType.toLowerCase().replace(/([A-Z])/g, '.$1'),
+    }),
   ],
   controllers: [OrderController],
-  providers: [OrderService, OrderRepository, OutboxRepository, OutboxPublisherWorker],
+  providers: [OrderService, OrderRepository],
   exports: [OrderService, OrderRepository],
 })
 export class OrderServiceModule {}

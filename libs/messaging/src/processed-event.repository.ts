@@ -1,17 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ProcessedEvent } from '@app/database/entities';
-import { BaseRepository } from '@app/database/repositories';
+import { ProcessedEvent } from '@app/database';
 
 @Injectable()
-export class ProcessedEventRepository extends BaseRepository<ProcessedEvent> {
+export class ProcessedEventRepository {
   constructor(
     @InjectRepository(ProcessedEvent)
-    private processedEventRepository: Repository<ProcessedEvent>
-  ) {
-    super(processedEventRepository);
-  }
+    private readonly processedEventRepository: Repository<ProcessedEvent>
+  ) {}
 
   async findProcessedEvent(eventId: string, consumerId: string): Promise<ProcessedEvent | null> {
     return this.processedEventRepository.findOne({

@@ -1,5 +1,5 @@
 import { Column, Entity, ManyToOne } from 'typeorm';
-import { BaseEntity } from './base.entity';
+import { BaseEntity } from '@app/database';
 import { Payment } from './payment.entity';
 
 @Entity('payment_attempts')
