@@ -19,16 +19,10 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "paths": {
-      "@app/common": ["libs/common/src"],
-      "@app/common/*": ["libs/common/src/*"],
       "@app/database": ["libs/database/src"],
       "@app/database/*": ["libs/database/src/*"],
-      "@app/config": ["libs/config/src"],
-      "@app/config/*": ["libs/config/src/*"],
       "@app/messaging": ["libs/messaging/src"],
-      "@app/messaging/*": ["libs/messaging/src/*"],
-      "@app/auth": ["libs/auth/src"],
-      "@app/auth/*": ["libs/auth/src/*"]
+      "@app/messaging/*": ["libs/messaging/src/*"]
     }
   },
   "include": ["apps/**/*", "libs/**/*"],

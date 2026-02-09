@@ -35,35 +35,14 @@
       "entryFile": "main",
       "sourceRoot": "apps/email-service/src"
     },
-    "accounting-service": {
-      "type": "application",
-      "root": "apps/accounting-service",
-      "entryFile": "main",
-      "sourceRoot": "apps/accounting-service/src"
-    },
-    "common": {
-      "type": "library",
-      "root": "libs/common",
-      "entryFile": "index"
-    },
     "database": {
       "type": "library",
       "root": "libs/database",
       "entryFile": "index"
     },
-    "config": {
-      "type": "library",
-      "root": "libs/config",
-      "entryFile": "index"
-    },
     "messaging": {
       "type": "library",
       "root": "libs/messaging",
-      "entryFile": "index"
-    },
-    "auth": {
-      "type": "library",
-      "root": "libs/auth",
       "entryFile": "index"
     }
   }
