@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ClientsModule } from '@nestjs/microservices';
-import { OutboxEvent } from '@app/database';
-import { MessagingModule, getRabbitMQConfig } from '@app/messaging';
+import { DatabaseModule, OutboxEvent } from '@app/database';
+import { MessagingModule } from '@app/messaging';
 import { Order, OrderItem } from './entities';
 import { OrderController } from './controllers/order.controller';
 import { OrderService } from './services/order.service';
@@ -11,16 +11,13 @@ import { OrderRepository } from './repositories/order.repository';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ envFilePath: '.env.order' }),
+    DatabaseModule,
     TypeOrmModule.forFeature([Order, OrderItem, OutboxEvent]),
     ScheduleModule.forRoot(),
-    ClientsModule.register([
-      {
-        name: 'ORDER_SERVICE',
-        ...getRabbitMQConfig('order_service_queue'),
-      },
-    ]),
     MessagingModule.forProducer({
       clientToken: 'ORDER_SERVICE',
+      queue: 'order_service_queue',
       patternTransformer: (eventType) => eventType.toLowerCase().replace(/([A-Z])/g, '.$1'),
     }),
   ],
