@@ -40,6 +40,11 @@ describe('PaymentCompletedConsumer', () => {
   describe('handlePaymentCompleted', () => {
     const message = {
       id: 'event-123',
+      aggregateId: 'order-123',
+      eventType: 'payment.completed',
+      timestamp: new Date(),
+      data: {},
+      version: 1,
       paymentId: 'payment-123',
       orderId: 'order-123',
       amount: 100.0,
