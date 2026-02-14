@@ -15,10 +15,14 @@ import { OrderRepository } from './repositories/order.repository';
     DatabaseModule,
     TypeOrmModule.forFeature([Order, OrderItem, OutboxEvent]),
     ScheduleModule.forRoot(),
-    MessagingModule.forProducer({
+    MessagingModule.forDirectProducer({
       clientToken: 'ORDER_SERVICE',
-      queue: 'order_service_queue',
-      patternTransformer: (eventType) => eventType.toLowerCase().replace(/([A-Z])/g, '.$1'),
+      queue: 'payment_service_queue',
+      patternTransformer: (eventType) =>
+        eventType
+          .replace(/([A-Z])/g, '.$1')
+          .toLowerCase()
+          .slice(1),
     }),
   ],
   controllers: [OrderController],

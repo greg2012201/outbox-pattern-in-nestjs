@@ -16,14 +16,14 @@ import { OrderCreatedConsumer } from './consumers/order-created.consumer';
     DatabaseModule,
     TypeOrmModule.forFeature([Payment, PaymentAttempt, OutboxEvent, ProcessedEvent]),
     ScheduleModule.forRoot(),
-    MessagingModule.forProducer({
-      clientToken: 'PAYMENT_SERVICE',
-      queue: 'payment_service_queue',
+    MessagingModule.forFanoutProducer({
+      exchange: 'payment.events',
       patternTransformer: (eventType) => `payment.${eventType.toLowerCase()}`,
     }),
     MessagingModule.forConsumer(),
   ],
-  providers: [PaymentService, PaymentRepository, PaymentAttemptRepository, OrderCreatedConsumer],
+  controllers: [OrderCreatedConsumer],
+  providers: [PaymentService, PaymentRepository, PaymentAttemptRepository],
   exports: [PaymentService, PaymentRepository],
 })
 export class PaymentServiceModule {}

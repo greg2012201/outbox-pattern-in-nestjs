@@ -94,13 +94,14 @@ describe('PaymentCompletedConsumer', () => {
       expect(emailService.sendConfirmationEmail).not.toHaveBeenCalled();
     });
 
-    it('should handle email service errors gracefully', async () => {
+    it('should handle email service errors gracefully without throwing', async () => {
       jest.spyOn(processedEventRepository, 'findProcessedEvent').mockResolvedValue(null);
       jest
         .spyOn(emailService, 'sendConfirmationEmail')
         .mockRejectedValue(new Error('Email sending failed'));
 
-      await expect(consumer.handlePaymentCompleted(message)).rejects.toThrow();
+      await expect(consumer.handlePaymentCompleted(message)).resolves.not.toThrow();
+      expect(processedEventRepository.markAsProcessed).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,5 +1,5 @@
 import { Controller, Logger } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, Payload } from '@nestjs/microservices';
 import { PaymentService } from '../services/payment.service';
 import { ProcessedEventRepository } from '@app/messaging';
 
@@ -12,7 +12,7 @@ export class OrderCreatedConsumer {
     private readonly processedEventRepository: ProcessedEventRepository
   ) {}
 
-  @MessagePattern('order.created')
+  @EventPattern('order.created')
   async handleOrderCreated(
     @Payload()
     message: {
@@ -34,7 +34,7 @@ export class OrderCreatedConsumer {
         message.id,
         consumerId
       );
-      // Idempotency condition
+
       if (processed) {
         this.logger.warn(`Event ${message.id} already processed by ${consumerId}`);
         return;
@@ -53,7 +53,6 @@ export class OrderCreatedConsumer {
       this.logger.log(`Successfully processed OrderCreated event for order ${message.orderId}`);
     } catch (error) {
       this.logger.error(`Error processing OrderCreated event:`, error);
-      throw error;
     }
   }
 }

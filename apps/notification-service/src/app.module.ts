@@ -13,9 +13,12 @@ import { PaymentCompletedConsumer } from './consumers/payment-completed.consumer
     ConfigModule.forRoot({ envFilePath: '.env.notification' }),
     DatabaseModule,
     TypeOrmModule.forFeature([Notification, ProcessedEvent]),
-    MessagingModule.forConsumer(),
+    MessagingModule.forConsumer({
+      bindings: [{ exchange: 'payment.events', queue: 'notification_service_queue' }],
+    }),
   ],
-  providers: [NotificationService, NotificationRepository, PaymentCompletedConsumer],
+  controllers: [PaymentCompletedConsumer],
+  providers: [NotificationService, NotificationRepository],
   exports: [NotificationService, NotificationRepository],
 })
 export class NotificationServiceModule {}

@@ -100,7 +100,7 @@ describe('OrderCreatedConsumer', () => {
       expect(paymentService.processPayment).not.toHaveBeenCalled();
     });
 
-    it('should handle payment service errors gracefully', async () => {
+    it('should handle payment service errors gracefully without throwing', async () => {
       const message = {
         id: 'event-123',
         orderId: 'order-123',
@@ -115,7 +115,8 @@ describe('OrderCreatedConsumer', () => {
         .spyOn(paymentService, 'processPayment')
         .mockRejectedValue(new Error('Payment processing failed'));
 
-      await expect(consumer.handleOrderCreated(message)).rejects.toThrow();
+      await expect(consumer.handleOrderCreated(message)).resolves.not.toThrow();
+      expect(processedEventRepository.markAsProcessed).not.toHaveBeenCalled();
     });
   });
 });

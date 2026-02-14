@@ -13,9 +13,12 @@ import { PaymentCompletedConsumer } from './consumers/payment-completed.consumer
     ConfigModule.forRoot({ envFilePath: '.env.email' }),
     DatabaseModule,
     TypeOrmModule.forFeature([Email, ProcessedEvent]),
-    MessagingModule.forConsumer(),
+    MessagingModule.forConsumer({
+      bindings: [{ exchange: 'payment.events', queue: 'email_service_queue' }],
+    }),
   ],
-  providers: [EmailService, EmailRepository, PaymentCompletedConsumer],
+  controllers: [PaymentCompletedConsumer],
+  providers: [EmailService, EmailRepository],
   exports: [EmailService, EmailRepository],
 })
 export class EmailServiceModule {}

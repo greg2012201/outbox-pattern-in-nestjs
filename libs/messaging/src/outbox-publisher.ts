@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { OutboxEvent, OutboxEventStatus } from '@app/database';
 import { v4 as uuid } from 'uuid';
 
@@ -25,9 +25,35 @@ export class OutboxPublisher {
     return this.dataSource.getRepository(OutboxEvent).save(outboxEvent);
   }
 
-  async getPendingEvents(): Promise<OutboxEvent[]> {
-    return this.dataSource.getRepository(OutboxEvent).find({
+  async claimPendingEvents(batchSize: number = 50): Promise<OutboxEvent[]> {
+    const repo = this.dataSource.getRepository(OutboxEvent);
+
+    const pendingEvents = await repo.find({
       where: { status: OutboxEventStatus.PENDING },
+      order: { createdAt: 'ASC' },
+      take: batchSize,
+    });
+
+    if (pendingEvents.length === 0) {
+      return [];
+    }
+
+    const ids = pendingEvents.map((e) => e.id);
+
+    const result = await repo
+      .createQueryBuilder()
+      .update(OutboxEvent)
+      .set({ status: OutboxEventStatus.PROCESSING })
+      .where('id IN (:...ids)', { ids })
+      .andWhere('status = :status', { status: OutboxEventStatus.PENDING })
+      .execute();
+
+    if (result.affected === 0) {
+      return [];
+    }
+
+    return repo.find({
+      where: { id: In(ids), status: OutboxEventStatus.PROCESSING },
       order: { createdAt: 'ASC' },
     });
   }
@@ -42,9 +68,11 @@ export class OutboxPublisher {
     if (retryCount >= 5) {
       await this.dataSource
         .getRepository(OutboxEvent)
-        .update(eventId, { status: OutboxEventStatus.FAILED });
+        .update(eventId, { status: OutboxEventStatus.FAILED, retryCount });
     } else {
-      await this.dataSource.getRepository(OutboxEvent).update(eventId, { retryCount });
+      await this.dataSource
+        .getRepository(OutboxEvent)
+        .update(eventId, { status: OutboxEventStatus.PENDING, retryCount });
     }
   }
 }

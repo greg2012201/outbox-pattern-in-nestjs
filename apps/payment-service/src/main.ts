@@ -9,7 +9,7 @@ dotenv.config({ path: '.env.payment' });
 async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     PaymentServiceModule,
-    getRabbitMQConfig('payment_service_queue')
+    getRabbitMQConfig({ queue: 'payment_service_queue', noAck: true })
   );
 
   await app.listen();

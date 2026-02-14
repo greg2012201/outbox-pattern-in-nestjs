@@ -1,5 +1,5 @@
 import { Controller, Logger } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, Payload } from '@nestjs/microservices';
 import { EmailService } from '../services/email.service';
 import { ProcessedEventRepository, PaymentCompletedEvent } from '@app/messaging';
 
@@ -12,7 +12,7 @@ export class PaymentCompletedConsumer {
     private readonly processedEventRepository: ProcessedEventRepository
   ) {}
 
-  @MessagePattern('payment.paymentcompleted')
+  @EventPattern('payment.paymentcompleted')
   async handlePaymentCompleted(
     @Payload()
     message: PaymentCompletedEvent & { id: string }
@@ -45,7 +45,6 @@ export class PaymentCompletedConsumer {
       this.logger.log(`Successfully processed PaymentCompleted event for order ${message.orderId}`);
     } catch (error) {
       this.logger.error(`Error processing PaymentCompleted event:`, error);
-      throw error;
     }
   }
 }

@@ -1,14 +1,33 @@
 import { Transport, RmqOptions } from '@nestjs/microservices';
 
-export const getRabbitMQConfig = (queue: string): RmqOptions => ({
-  transport: Transport.RMQ,
-  options: {
-    urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
-    queue,
-    queueOptions: {
-      durable: true,
+type RabbitMQConfigOptions = {
+  queue: string;
+  noAck?: boolean;
+  exchange?: string;
+};
+
+export function getRabbitMQConfig({
+  queue,
+  noAck = false,
+  exchange,
+}: RabbitMQConfigOptions): RmqOptions {
+  const config: RmqOptions = {
+    transport: Transport.RMQ,
+    options: {
+      urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
+      queue,
+      queueOptions: {
+        durable: true,
+      },
+      noAck,
+      prefetchCount: 0,
     },
-    noAck: false,
-    prefetchCount: 1,
-  },
-});
+  };
+
+  if (exchange) {
+    (config.options as any).exchange = exchange;
+    (config.options as any).exchangeType = 'fanout';
+  }
+
+  return config;
+}
