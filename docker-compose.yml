@@ -56,6 +56,12 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - payment-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q check_port_connectivity
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
 
 volumes:
   order_db_data:
