@@ -14,7 +14,7 @@ MODE="watch"
 
 for arg in "$@"; do
   case "$arg" in
-    --swc) BUILDER="swc" ;;
+  --swc) BUILDER="swc" ;;
   esac
 done
 
@@ -76,7 +76,7 @@ for container in order-db payment-db notification-db rabbitmq; do
 done
 
 log_info "Checking for port conflicts..."
-REQUIRED_PORTS="5432 5433 5434 5672 15672"
+REQUIRED_PORTS="5432 5433 5434 5672 15672 3000 3001"
 for port in $REQUIRED_PORTS; do
   container_id=$(docker ps -q --filter "publish=$port" 2>/dev/null || true)
   if [ -n "$container_id" ]; then
@@ -112,17 +112,30 @@ log_info "Waiting for infrastructure to be ready..."
 wait_for_port localhost 5432 "PostgreSQL (order-db)"
 wait_for_port localhost 5433 "PostgreSQL (payment-db)"
 wait_for_port localhost 5434 "PostgreSQL (notification-db)"
-wait_for_port localhost 5672 "RabbitMQ"
+wait_for_port localhost 5672 "RabbitMQ (port)"
+
+log_info "Waiting for RabbitMQ broker to be fully ready..."
+rabbitmq_retries=30
+rabbitmq_count=0
+while ! docker exec rabbitmq rabbitmq-diagnostics -q check_port_connectivity >/dev/null 2>&1; do
+  rabbitmq_count=$((rabbitmq_count + 1))
+  if [ "$rabbitmq_count" -ge "$rabbitmq_retries" ]; then
+    log_error "RabbitMQ broker did not become ready in time"
+    exit 1
+  fi
+  sleep 1
+done
+log_success "RabbitMQ broker is fully ready"
 
 log_success "All infrastructure services are ready"
 
 log_info "Starting NestJS services in $MODE mode ($BUILDER)..."
 
-npx nest start api-gateway --watch --builder "$BUILDER" 2>&1 | sed "s/^/[api-gateway] /" &
-npx nest start order-service --watch --builder "$BUILDER" 2>&1 | sed "s/^/[order-service] /" &
-npx nest start payment-service --watch --builder "$BUILDER" 2>&1 | sed "s/^/[payment-service] /" &
-npx nest start notification-service --watch --builder "$BUILDER" 2>&1 | sed "s/^/[notification-service] /" &
-npx nest start email-service --watch --builder "$BUILDER" 2>&1 | sed "s/^/[email-service] /" &
+npx nest start api-gateway --watch --builder "$BUILDER" 2>&1 | sed --unbuffered "s/^/[api-gateway] /" &
+npx nest start order-service --watch --builder "$BUILDER" 2>&1 | sed --unbuffered "s/^/[order-service] /" &
+npx nest start payment-service --watch --builder "$BUILDER" 2>&1 | sed --unbuffered "s/^/[payment-service] /" &
+npx nest start notification-service --watch --builder "$BUILDER" 2>&1 | sed --unbuffered "s/^/[notification-service] /" &
+npx nest start email-service --watch --builder "$BUILDER" 2>&1 | sed --unbuffered "s/^/[email-service] /" &
 
 log_success "All services started"
 printf "\n"
