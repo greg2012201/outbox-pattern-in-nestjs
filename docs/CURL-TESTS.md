@@ -25,6 +25,7 @@ PAYMENT_EXCHANGE="payment.events"
 ```bash
 curl -v -X POST "http://localhost:3001/orders" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000" \
   -d '{
     "userId": "user-123",
     "currency": "USD",
@@ -36,7 +37,10 @@ curl -v -X POST "http://localhost:3001/orders" \
   }'
 
 # Example: extract order id from response (if response contains `id`)
-curl -s -X POST "$API_HOST/orders" -H "Content-Type: application/json" -d '{"userId":"u1","currency":"USD","totalAmount":10,"items":[{"productId":"p1","quantity":1,"unitPrice":10}]}' | jq -r '.id'
+curl -s -X POST "$API_HOST/orders" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{"userId":"u1","currency":"USD","totalAmount":10,"items":[{"productId":"p1","quantity":1,"unitPrice":10}]}' | jq -r '.id'
 ```
 
 2. Create an invalid order (validation error)
@@ -44,6 +48,7 @@ curl -s -X POST "$API_HOST/orders" -H "Content-Type: application/json" -d '{"use
 ```bash
 curl -v -X POST "$API_HOST/orders" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001" \
   -d '{ "userId": "", "items": [] }'
 ```
 
@@ -133,5 +138,37 @@ Notes & tips:
 - If your services are behind different ports change `API_HOST` accordingly (see `.env` templates in `payment-service-plan.md`).
 - The RabbitMQ management API approach uses the management plugin and is intended for manual testing only — prefer production-safe tooling for automated tests.
 - If your API returns a different JSON shape adapt the `jq` extraction commands accordingly.
+
+9. Idempotency replay (orders API)
+
+```bash
+IDEMPOTENCY_KEY="550e8400-e29b-41d4-a716-446655440002"
+
+curl -v -X POST "$API_HOST/orders" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -d '{
+    "userId": "user-123",
+    "currency": "USD",
+    "totalAmount": 49.95,
+    "items": [
+      {"productId": "prod-abc", "quantity": 1, "unitPrice": 49.95}
+    ]
+  }'
+
+curl -v -X POST "$API_HOST/orders" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -d '{
+    "userId": "user-123",
+    "currency": "USD",
+    "totalAmount": 49.95,
+    "items": [
+      {"productId": "prod-abc", "quantity": 1, "unitPrice": 49.95}
+    ]
+  }'
+```
+
+Expected: second call returns the same response with `X-Idempotency-Replayed: true`.
 
 File: `docs/CURL-TESTS.md`
