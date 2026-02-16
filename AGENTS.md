@@ -49,3 +49,9 @@
 - `docs/`
 - `tools/scripts/`
 - `test/integration/`
+
+## API idempotency
+
+- `POST /orders` requires `Idempotency-Key` (UUID v4) and rejects missing or invalid keys.
+- Duplicate requests with the same key return the cached response and `X-Idempotency-Replayed: true`.
+- Concurrent requests with the same key return `409` with code `IDEMPOTENCY_CONFLICT`.
