@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderController } from './order.controller';
 import { OrderService } from '../services/order.service';
+import { IdempotencyService } from '../services/idempotency.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 
 describe('OrderController', () => {
@@ -13,6 +14,13 @@ describe('OrderController', () => {
     getAllOrders: jest.fn(),
   };
 
+  const mockIdempotencyService = {
+    acquireLock: jest.fn(),
+    complete: jest.fn(),
+    unlock: jest.fn(),
+    cleanupExpired: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrderController],
@@ -20,6 +28,10 @@ describe('OrderController', () => {
         {
           provide: OrderService,
           useValue: mockOrderService,
+        },
+        {
+          provide: IdempotencyService,
+          useValue: mockIdempotencyService,
         },
       ],
     }).compile();

@@ -2,18 +2,20 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { DatabaseModule, OutboxEvent } from '@app/database';
+import { DatabaseModule, OutboxEvent, IdempotencyRecord } from '@app/database';
 import { MessagingModule } from '@app/messaging';
 import { Order, OrderItem } from './entities';
 import { OrderController } from './controllers/order.controller';
 import { OrderService } from './services/order.service';
 import { OrderRepository } from './repositories/order.repository';
+import { IdempotencyService } from './services/idempotency.service';
+import { IdempotencyInterceptor } from './interceptors/idempotency.interceptor';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ envFilePath: '.env.order' }),
     DatabaseModule,
-    TypeOrmModule.forFeature([Order, OrderItem, OutboxEvent]),
+    TypeOrmModule.forFeature([Order, OrderItem, OutboxEvent, IdempotencyRecord]),
     ScheduleModule.forRoot(),
     MessagingModule.forDirectProducer({
       clientToken: 'ORDER_SERVICE',
@@ -26,7 +28,7 @@ import { OrderRepository } from './repositories/order.repository';
     }),
   ],
   controllers: [OrderController],
-  providers: [OrderService, OrderRepository],
+  providers: [OrderService, OrderRepository, IdempotencyService, IdempotencyInterceptor],
   exports: [OrderService, OrderRepository],
 })
 export class OrderServiceModule {}

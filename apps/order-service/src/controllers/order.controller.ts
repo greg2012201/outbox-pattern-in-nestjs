@@ -1,7 +1,18 @@
-import { Controller, Post, Get, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseInterceptors,
+} from '@nestjs/common';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { OrderDto } from '../dto/order.dto';
 import { OrderService } from '../services/order.service';
+import { IdempotencyInterceptor } from '../interceptors/idempotency.interceptor';
 
 @Controller('orders')
 export class OrderController {
@@ -9,6 +20,7 @@ export class OrderController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyInterceptor)
   async createOrder(@Body() createOrderDto: CreateOrderDto): Promise<OrderDto> {
     return this.orderService.createOrder(createOrderDto);
   }

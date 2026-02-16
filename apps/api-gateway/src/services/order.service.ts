@@ -10,10 +10,23 @@ export class OrderService {
 
   constructor(private readonly httpService: HttpService) {}
 
-  async createOrder(createOrderDto: CreateOrderDto): Promise<OrderDto> {
+  async createOrder({
+    createOrderDto,
+    idempotencyKey,
+  }: {
+    createOrderDto: CreateOrderDto;
+    idempotencyKey?: string;
+  }): Promise<OrderDto> {
     try {
+      const headers: Record<string, string> = {};
+      if (idempotencyKey) {
+        headers['Idempotency-Key'] = idempotencyKey;
+      }
+
       const response = await firstValueFrom(
-        this.httpService.post<OrderDto>(`${this.orderServiceUrl}/orders`, createOrderDto)
+        this.httpService.post<OrderDto>(`${this.orderServiceUrl}/orders`, createOrderDto, {
+          headers,
+        })
       );
       return response.data;
     } catch (error) {

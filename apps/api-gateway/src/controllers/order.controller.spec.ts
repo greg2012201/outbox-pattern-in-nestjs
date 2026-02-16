@@ -64,11 +64,15 @@ describe('API Gateway OrderController', () => {
 
       mockOrderService.createOrder.mockResolvedValue(mockOrder);
 
-      const result = await controller.createOrder(createOrderDto);
+      const idempotencyKey = '550e8400-e29b-41d4-a716-446655440000';
+      const result = await controller.createOrder(createOrderDto, idempotencyKey);
 
       expect(result).toBeDefined();
       expect(result.id).toBe('order-123');
-      expect(mockOrderService.createOrder).toHaveBeenCalledWith(createOrderDto);
+      expect(mockOrderService.createOrder).toHaveBeenCalledWith({
+        createOrderDto,
+        idempotencyKey,
+      });
     });
 
     it('should handle service error', async () => {
@@ -83,7 +87,7 @@ describe('API Gateway OrderController', () => {
         new HttpException('Internal server error', HttpStatus.INTERNAL_SERVER_ERROR)
       );
 
-      await expect(controller.createOrder(createOrderDto)).rejects.toThrow();
+      await expect(controller.createOrder(createOrderDto, undefined)).rejects.toThrow();
     });
   });
 
