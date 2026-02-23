@@ -8,6 +8,11 @@ import { PaymentRepository } from '../repositories/payment.repository';
 import { PaymentAttemptRepository } from '../repositories/payment-attempt.repository';
 import { v4 as uuid } from 'uuid';
 
+type PaymentProviderRequest = {
+  amount: number;
+  currency: string;
+};
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
@@ -44,7 +49,7 @@ export class PaymentService {
 
       const savedPayment = await queryRunner.manager.save(payment);
 
-      const paymentResult = await this.callPaymentProvider(amount, currency);
+      const paymentResult = await this.callPaymentProvider({ amount, currency });
 
       const updatedPayment = { ...savedPayment };
       if (paymentResult.success) {
@@ -109,22 +114,30 @@ export class PaymentService {
     return this.mapToDto(payment);
   }
 
-  private async callPaymentProvider(
-    amount: number,
-    currency: string
-  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
-    const random = Math.random();
-    if (random > 0.1) {
-      return {
-        success: true,
-        transactionId: `txn_${uuid()}`,
-      };
-    } else {
-      return {
-        success: false,
-        error: 'Payment provider temporarily unavailable',
-      };
+  private async callPaymentProvider({ amount, currency }: PaymentProviderRequest) {
+    const pollCount = 3;
+    const jitter = (amount % 100) + currency.length;
+
+    for (let attempt = 1; attempt <= pollCount; attempt += 1) {
+      await this.wait(250 + attempt * 150 + (jitter % 50));
+      const random = Math.random();
+
+      if (random > 0.7) {
+        return {
+          success: true,
+          transactionId: `txn_${uuid()}`,
+        };
+      }
     }
+
+    return {
+      success: false,
+      error: 'Payment provider temporarily unavailable',
+    };
+  }
+
+  private wait(ms: number) {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
 
   private mapToDto(payment: Payment): PaymentDto {
