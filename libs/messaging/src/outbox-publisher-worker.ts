@@ -29,14 +29,14 @@ export class OutboxPublisherWorker {
     this.isProcessing = true;
 
     try {
-      const pendingEvents = await this.outboxPublisher.claimPendingEvents();
-      if (pendingEvents.length === 0) {
+      const { claimId, events } = await this.outboxPublisher.claimPendingEvents();
+      if (events.length === 0) {
         return;
       }
 
-      this.logger.log(`Found ${pendingEvents.length} pending events to publish`);
+      this.logger.log(`Claimed ${events.length} events (claimId: ${claimId})`);
 
-      for (const event of pendingEvents) {
+      for (const event of events) {
         try {
           const pattern = this.transformPattern(event.eventType);
           const message = {
@@ -46,11 +46,15 @@ export class OutboxPublisherWorker {
 
           await this.messagePublisher.publish(pattern, message);
 
-          await this.outboxPublisher.markEventAsSent(event.id);
+          await this.outboxPublisher.markEventAsSent({ eventId: event.id, claimId });
           this.logger.log(`Published event ${event.id} of type ${event.eventType}`);
         } catch (error) {
           this.logger.error(`Failed to publish event ${event.id}, will retry:`, error);
-          await this.outboxPublisher.markEventAsFailed(event.id, event.retryCount + 1);
+          await this.outboxPublisher.markEventAsFailed({
+            eventId: event.id,
+            claimId,
+            retryCount: event.retryCount + 1,
+          });
         }
       }
     } catch (error) {

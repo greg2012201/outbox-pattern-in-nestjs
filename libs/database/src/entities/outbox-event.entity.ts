@@ -1,4 +1,4 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, Index } from 'typeorm';
 import { BaseEntity } from './base.entity';
 
 export enum OutboxEventStatus {
@@ -9,6 +9,7 @@ export enum OutboxEventStatus {
 }
 
 @Entity('outbox_events')
+@Index('idx_outbox_events_status_created', ['status', 'createdAt'])
 export class OutboxEvent extends BaseEntity {
   @Column()
   aggregateType: string;
@@ -25,9 +26,14 @@ export class OutboxEvent extends BaseEntity {
   @Column({
     type: 'varchar',
     default: OutboxEventStatus.PENDING,
-    comment: "Check constraint: status IN ('PENDING', 'SENT', 'FAILED')",
   })
   status: OutboxEventStatus;
+
+  @Column({ type: 'uuid', nullable: true })
+  processingClaim: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  processingStartedAt: Date | null;
 
   @Column({ default: 0 })
   retryCount: number;
