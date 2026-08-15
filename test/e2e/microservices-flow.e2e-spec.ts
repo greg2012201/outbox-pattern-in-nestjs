@@ -184,47 +184,58 @@ describe('microservices outbox and inbox flow (e2e)', () => {
 
     const orderOutbox = await new DataSource(databaseConnection(databases.order)).initialize();
     const paymentOutbox = await new DataSource(databaseConnection(databases.payment)).initialize();
-    await waitFor(async () => {
-      const orderSent = await orderOutbox.getRepository(OutboxEvent).existsBy({
-        aggregateId: order.id,
-        status: OutboxEventStatus.SENT,
+    try {
+      await waitFor(async () => {
+        const orderSent = await orderOutbox.getRepository(OutboxEvent).existsBy({
+          aggregateId: order.id,
+          status: OutboxEventStatus.SENT,
+        });
+        const paymentSent = (
+          await paymentOutbox.getRepository(OutboxEvent).find({
+            where: { status: OutboxEventStatus.SENT },
+          })
+        ).some((event) => event.payload.orderId === order.id);
+        return orderSent && paymentSent;
       });
-      const paymentSent = (
-        await paymentOutbox.getRepository(OutboxEvent).find({
-          where: { status: OutboxEventStatus.SENT },
-        })
-      ).some((event) => event.payload.orderId === order.id);
-      return orderSent && paymentSent;
-    });
-    await orderOutbox.destroy();
-    await paymentOutbox.destroy();
+    } finally {
+      await orderOutbox.destroy();
+      await paymentOutbox.destroy();
+    }
 
     const notificationInbox = await new DataSource(
       databaseConnection(databases.notification)
     ).initialize();
-    await waitFor(async () => {
-      const count = await notificationInbox
+    try {
+      await waitFor(async () => {
+        const count = await notificationInbox
+          .getRepository(InboxMessage)
+          .countBy({ status: InboxMessageStatus.PROCESSED });
+        return count > 0;
+      });
+      const notificationProcessed = await notificationInbox
         .getRepository(InboxMessage)
         .countBy({ status: InboxMessageStatus.PROCESSED });
-      return count > 0;
-    });
-    const notificationProcessed = await notificationInbox
-      .getRepository(InboxMessage)
-      .countBy({ status: InboxMessageStatus.PROCESSED });
-    expect(notificationProcessed).toBe(1);
-    await notificationInbox.destroy();
+      expect(notificationProcessed).toBe(1);
+    } finally {
+      await notificationInbox.destroy();
+    }
 
     const emailInbox = await new DataSource(databaseConnection(databases.email)).initialize();
-    await waitFor(async () => {
-      const count = await emailInbox
-        .getRepository(InboxMessage)
-        .countBy({ status: InboxMessageStatus.PROCESSED });
-      return count > 0;
-    });
-    expect(
-      await emailInbox.getRepository(InboxMessage).countBy({ status: InboxMessageStatus.PROCESSED })
-    ).toBe(1);
-    await emailInbox.destroy();
+    try {
+      await waitFor(async () => {
+        const count = await emailInbox
+          .getRepository(InboxMessage)
+          .countBy({ status: InboxMessageStatus.PROCESSED });
+        return count > 0;
+      });
+      expect(
+        await emailInbox
+          .getRepository(InboxMessage)
+          .countBy({ status: InboxMessageStatus.PROCESSED })
+      ).toBe(1);
+    } finally {
+      await emailInbox.destroy();
+    }
     provider.mockRestore();
   });
 
@@ -284,23 +295,26 @@ describe('microservices outbox and inbox flow (e2e)', () => {
     const order = (await response.json()) as { id: string };
 
     const paymentOutbox = await new DataSource(databaseConnection(databases.payment)).initialize();
-    await waitFor(async () => {
-      const events = await paymentOutbox.getRepository(OutboxEvent).find({
-        where: { eventType: 'PaymentFailed' },
+    try {
+      await waitFor(async () => {
+        const events = await paymentOutbox.getRepository(OutboxEvent).find({
+          where: { eventType: 'PaymentFailed' },
+        });
+        return events.some(
+          (event) => event.payload.orderId === order.id && event.status === OutboxEventStatus.SENT
+        );
       });
-      return events.some(
-        (event) => event.payload.orderId === order.id && event.status === OutboxEventStatus.SENT
-      );
-    });
-    expect(
-      (
-        await paymentOutbox
-          .getRepository(OutboxEvent)
-          .find({ where: { eventType: 'PaymentFailed' } })
-      ).some((event) => event.payload.orderId === order.id)
-    ).toBe(true);
-    await paymentOutbox.destroy();
-    provider.mockRestore();
+      expect(
+        (
+          await paymentOutbox
+            .getRepository(OutboxEvent)
+            .find({ where: { eventType: 'PaymentFailed' } })
+        ).some((event) => event.payload.orderId === order.id)
+      ).toBe(true);
+    } finally {
+      await paymentOutbox.destroy();
+      provider.mockRestore();
+    }
   });
 
   it('dead-letters an inbox message that has no message id', async () => {
@@ -313,11 +327,22 @@ describe('microservices outbox and inbox flow (e2e)', () => {
         persistent: true,
       }
     );
-    await waitFor(
-      async () => (await channel.checkQueue('payment_service_queue.dlq')).messageCount > 0
-    );
-    expect((await channel.checkQueue('payment_service_queue.dlq')).messageCount).toBeGreaterThan(0);
     await channel.close();
     await broker.close();
+
+    const hasDeadLetter = async () => {
+      const attemptBroker = await connect(process.env.RABBITMQ_URL);
+      const attemptChannel = await attemptBroker.createChannel();
+      try {
+        return (await attemptChannel.checkQueue('payment_service_queue.dlq')).messageCount > 0;
+      } catch {
+        return false;
+      } finally {
+        await attemptChannel.close().catch(() => undefined);
+        await attemptBroker.close();
+      }
+    };
+    await waitFor(hasDeadLetter);
+    expect(await hasDeadLetter()).toBe(true);
   });
 });
