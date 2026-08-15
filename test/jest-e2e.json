@@ -6,6 +6,7 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "testEnvironment": "node",
+  "transformIgnorePatterns": ["/node_modules/(?!uuid)"],
   "moduleNameMapper": {
     "^@app/database$": "<rootDir>/libs/database/src",
     "^@app/database/(.*)$": "<rootDir>/libs/database/src/$1",

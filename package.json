@@ -52,6 +52,8 @@
     "@nestjs/testing": "^11.1.12",
     "@swc/cli": "^0.7.10",
     "@swc/core": "^1.15.11",
+    "@testcontainers/postgresql": "^10.28.0",
+    "@testcontainers/rabbitmq": "^10.28.0",
     "@types/jest": "^29.5.11",
     "@types/node": "^25.1.0",
     "@types/uuid": "^10.0.0",
