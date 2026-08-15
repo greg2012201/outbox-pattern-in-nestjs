@@ -162,6 +162,13 @@ describe('microservices outbox and inbox flow (e2e)', () => {
   it('processes an order through every service and marks outbox/inbox records complete', async () => {
     const apiPort = (apiGateway.getHttpServer().address() as { port: number }).port;
     const idempotencyKey = '4f2f4f7b-1e32-4d22-a8f6-7d31b7bd0b45';
+    const payment = paymentService.get(PaymentService);
+    const provider = jest
+      .spyOn(payment as never, 'callPaymentProvider' as never)
+      .mockResolvedValue({
+        success: true,
+        transactionId: 'e2e-success-transaction',
+      } as never);
     const response = await fetch(`http://127.0.0.1:${apiPort}/orders`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'Idempotency-Key': idempotencyKey },
@@ -175,11 +182,9 @@ describe('microservices outbox and inbox flow (e2e)', () => {
     expect(response.status).toBe(201);
     const order = (await response.json()) as { id: string };
 
+    const orderOutbox = await new DataSource(databaseConnection(databases.order)).initialize();
+    const paymentOutbox = await new DataSource(databaseConnection(databases.payment)).initialize();
     await waitFor(async () => {
-      const orderOutbox = await new DataSource(databaseConnection(databases.order)).initialize();
-      const paymentOutbox = await new DataSource(
-        databaseConnection(databases.payment)
-      ).initialize();
       const orderSent = await orderOutbox.getRepository(OutboxEvent).existsBy({
         aggregateId: order.id,
         status: OutboxEventStatus.SENT,
@@ -189,10 +194,10 @@ describe('microservices outbox and inbox flow (e2e)', () => {
           where: { status: OutboxEventStatus.SENT },
         })
       ).some((event) => event.payload.orderId === order.id);
-      await orderOutbox.destroy();
-      await paymentOutbox.destroy();
       return orderSent && paymentSent;
     });
+    await orderOutbox.destroy();
+    await paymentOutbox.destroy();
 
     const notificationInbox = await new DataSource(
       databaseConnection(databases.notification)
@@ -210,10 +215,17 @@ describe('microservices outbox and inbox flow (e2e)', () => {
     await notificationInbox.destroy();
 
     const emailInbox = await new DataSource(databaseConnection(databases.email)).initialize();
+    await waitFor(async () => {
+      const count = await emailInbox
+        .getRepository(InboxMessage)
+        .countBy({ status: InboxMessageStatus.PROCESSED });
+      return count > 0;
+    });
     expect(
       await emailInbox.getRepository(InboxMessage).countBy({ status: InboxMessageStatus.PROCESSED })
     ).toBe(1);
     await emailInbox.destroy();
+    provider.mockRestore();
   });
 
   it('rejects invalid idempotency keys and replays a duplicate request without creating another order', async () => {
