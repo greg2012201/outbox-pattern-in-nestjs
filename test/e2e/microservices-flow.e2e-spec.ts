@@ -1,4 +1,3 @@
-/// <reference types="jest" />
 import { INestApplication } from '@nestjs/common';
 import { INestMicroservice } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
