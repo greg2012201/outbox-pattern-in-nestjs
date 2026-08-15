@@ -1,0 +1,16 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testRegex": "test/e2e/.*\\.e2e-spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "testEnvironment": "node",
+  "moduleNameMapper": {
+    "^@app/database$": "<rootDir>/libs/database/src",
+    "^@app/database/(.*)$": "<rootDir>/libs/database/src/$1",
+    "^@app/messaging$": "<rootDir>/libs/messaging/src",
+    "^@app/messaging/(.*)$": "<rootDir>/libs/messaging/src/$1"
+  },
+  "testTimeout": 180000
+}
