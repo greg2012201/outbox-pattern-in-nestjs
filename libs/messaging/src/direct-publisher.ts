@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
+import { ClientProxy, RmqRecordBuilder } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 
 @Injectable()
@@ -10,6 +10,13 @@ export class DirectPublisher {
   ) {}
 
   async publish(pattern: string, message: Record<string, any>) {
-    await lastValueFrom(this.client.emit(pattern, message), { defaultValue: undefined });
+    const messageId = typeof message.id === 'string' ? message.id : undefined;
+    const payload = messageId
+      ? new RmqRecordBuilder(message)
+          .setOptions({ persistent: true, messageId })
+          .build()
+      : new RmqRecordBuilder(message).setOptions({ persistent: true }).build();
+
+    await lastValueFrom(this.client.emit(pattern, payload), { defaultValue: undefined });
   }
 }

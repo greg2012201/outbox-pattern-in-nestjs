@@ -27,8 +27,17 @@ export class FanoutPublisher implements OnModuleInit, OnModuleDestroy {
 
   async publish(pattern: string, message: Record<string, any>) {
     const payload = Buffer.from(JSON.stringify({ pattern, data: message }));
+    const messageId = typeof message.id === 'string' ? message.id : undefined;
+    const publishOptions = messageId
+      ? { persistent: true, messageId }
+      : { persistent: true };
 
-    await this.channel.publish(this.exchangeName, '', payload);
+    await this.channel.publish(
+      this.exchangeName,
+      '',
+      payload,
+      publishOptions as Parameters<ChannelWrapper['publish']>[3]
+    );
 
     this.logger.log(
       `Published to fanout exchange "${this.exchangeName}" with pattern "${pattern}"`

@@ -18,10 +18,10 @@
     "format": "prettier --write \"src/**/*.ts\" \"libs/**/*.ts\" \"apps/**/*.ts\" \"test/**/*.ts\"",
     "start:all": "sh tools/scripts/start-all.sh",
     "start:all:dev": "sh tools/scripts/start-all.sh --swc",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
     "docker:purge": "sh tools/scripts/docker-purge.sh",
-    "docker:logs": "docker-compose logs -f",
+    "docker:logs": "docker compose logs -f",
     "migrate": "typeorm migration:run -d dist/database/datasource.js",
     "migrate:create": "typeorm migration:create"
   },

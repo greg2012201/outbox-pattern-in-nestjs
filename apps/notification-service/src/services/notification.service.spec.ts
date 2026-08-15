@@ -1,16 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { EntityManager } from 'typeorm';
 import { NotificationService } from './notification.service';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { NotificationStatus, NotificationType } from '../entities';
 
-type MockNotificationRepository = Pick<NotificationRepository, 'findByEventId'> & {
-  create: jest.Mock;
-  update: jest.Mock;
-};
-
 describe('NotificationService', () => {
-  let service: NotificationService;
-  let notificationRepository: MockNotificationRepository;
+  let sut: NotificationService;
+  let notificationRepository: NotificationRepository;
+
+  const manager = {} as EntityManager;
+  const params = {
+    manager,
+    orderId: 'order-123',
+    paymentId: 'payment-123',
+    amount: 100,
+    currency: 'USD',
+    transactionId: 'txn_123',
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -19,93 +25,81 @@ describe('NotificationService', () => {
         {
           provide: NotificationRepository,
           useValue: {
-            findByEventId: jest.fn(),
-            create: jest.fn(),
+            createInTransaction: jest.fn(),
+            findById: jest.fn(),
             update: jest.fn(),
           },
         },
       ],
     }).compile();
 
-    service = module.get<NotificationService>(NotificationService);
-    notificationRepository = module.get<NotificationRepository>(
-      NotificationRepository
-    ) as unknown as MockNotificationRepository;
-
-    jest.clearAllMocks();
+    sut = module.get<NotificationService>(NotificationService);
+    notificationRepository = module.get<NotificationRepository>(NotificationRepository);
   });
 
   it('should be defined', () => {
-    expect(service).toBeDefined();
+    expect(sut).toBeDefined();
   });
 
-  describe('sendNotification', () => {
-    const params = {
-      orderId: 'order-123',
-      eventId: 'event-123',
-      paymentId: 'payment-123',
-      amount: 100.0,
-      currency: 'USD',
-      transactionId: 'txn_123',
-    };
+  it('creates a pending notification work item without delivering it', async () => {
+    const notification = createNotification();
+    jest.spyOn(notificationRepository, 'createInTransaction').mockResolvedValue(notification);
 
-    it('should create and send a push notification', async () => {
-      const mockNotification = {
-        id: 'notification-123',
-        orderId: params.orderId,
-        eventId: params.eventId,
-        type: NotificationType.PUSH,
-        status: NotificationStatus.PENDING,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        sentAt: null,
-      };
+    const result = await sut.createPendingNotification(params);
 
-      const sentNotification = {
-        ...mockNotification,
-        status: NotificationStatus.SENT,
-        sentAt: new Date(),
-      };
-
-      jest.spyOn(notificationRepository, 'findByEventId').mockResolvedValue(null);
-      notificationRepository.create.mockResolvedValue(mockNotification);
-      notificationRepository.update.mockResolvedValue(sentNotification);
-
-      const result = await service.sendNotification(params);
-
-      expect(notificationRepository.findByEventId).toHaveBeenCalledWith(params.eventId);
-      expect(notificationRepository.create).toHaveBeenCalledWith({
+    expect(notificationRepository.createInTransaction).toHaveBeenCalledWith({
+      manager,
+      data: {
         id: expect.any(String),
         orderId: params.orderId,
-        eventId: params.eventId,
+        paymentId: params.paymentId,
+        amount: params.amount,
+        currency: params.currency,
+        transactionId: params.transactionId,
         type: NotificationType.PUSH,
         status: NotificationStatus.PENDING,
-      });
-      expect(notificationRepository.update).toHaveBeenCalledWith(mockNotification.id, {
-        status: NotificationStatus.SENT,
-        sentAt: expect.any(Date),
-      });
-      expect(result.status).toBe(NotificationStatus.SENT);
+      },
     });
+    expect(result.status).toBe(NotificationStatus.PENDING);
+  });
 
-    it('should return existing notification if already processed', async () => {
-      const existingNotification = {
-        id: 'notification-123',
-        orderId: params.orderId,
-        eventId: params.eventId,
-        type: NotificationType.PUSH,
-        status: NotificationStatus.SENT,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        sentAt: new Date(),
-      };
+  it('delivers a pending notification separately from work-item creation', async () => {
+    const notification = createNotification();
+    const sentNotification = createNotification({ status: NotificationStatus.SENT });
+    jest.spyOn(notificationRepository, 'findById').mockResolvedValue(notification);
+    jest.spyOn(notificationRepository, 'update').mockResolvedValue(sentNotification);
 
-      jest.spyOn(notificationRepository, 'findByEventId').mockResolvedValue(existingNotification);
+    const result = await sut.deliverNotification(notification.id);
 
-      const result = await service.sendNotification(params);
-
-      expect(result.id).toBe(existingNotification.id);
-      expect(notificationRepository.create).not.toHaveBeenCalled();
+    expect(notificationRepository.update).toHaveBeenCalledWith(notification.id, {
+      status: NotificationStatus.SENT,
+      sentAt: expect.any(Date),
     });
+    expect(result.status).toBe(NotificationStatus.SENT);
   });
 });
+
+function createNotification(overrides: Partial<any> = {}) {
+  return {
+    id: 'notification-123',
+    orderId: paramsForTest.orderId,
+    paymentId: paramsForTest.paymentId,
+    amount: paramsForTest.amount,
+    currency: paramsForTest.currency,
+    transactionId: paramsForTest.transactionId,
+    type: NotificationType.PUSH,
+    status: NotificationStatus.PENDING,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    sentAt: null,
+    ...overrides,
+  };
+}
+
+const paramsForTest = {
+  orderId: 'order-123',
+  paymentId: 'payment-123',
+  amount: 100,
+  currency: 'USD',
+  transactionId: 'txn_123',
+};

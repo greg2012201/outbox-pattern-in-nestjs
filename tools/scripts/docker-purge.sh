@@ -23,7 +23,7 @@ log_warn() {
 log_info "Purging all Docker resources for the project..."
 
 log_info "Stopping and removing containers, networks, and volumes..."
-docker-compose -f "$ROOT_DIR/docker-compose.yml" down --volumes --remove-orphans 2>/dev/null || true
+docker compose -f "$ROOT_DIR/docker-compose.yml" down --volumes --remove-orphans 2>/dev/null || true
 
 log_info "Force-removing project containers..."
 for container in order-db payment-db notification-db rabbitmq; do
@@ -39,7 +39,7 @@ log_info "Removing project network..."
 docker network rm payment-service-outbox-pattern_payment-network 2>/dev/null || true
 
 log_info "Freeing up ports..."
-REQUIRED_PORTS="5432 5433 5434 5672 15672"
+REQUIRED_PORTS="25432 25433 25434 5672 15672"
 for port in $REQUIRED_PORTS; do
   pid=$(lsof -ti :"$port" 2>/dev/null || true)
   if [ -n "$pid" ]; then

@@ -6,4 +6,8 @@ export * from './direct-publisher';
 export * from './fanout-publisher';
 export * from './queue-binding.service';
 export * from './processed-event.repository';
+export * from './inbox.repository';
+export * from './inbox.service';
+export * from './inbox-message-processor';
+export * from './rmq-message-delivery.factory';
 export * from './messaging.module';

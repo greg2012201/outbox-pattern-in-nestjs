@@ -68,7 +68,7 @@ log_info "======================================================="
 log_info "Builder: $BUILDER"
 
 log_info "Stopping any existing Docker containers..."
-docker-compose -f "$ROOT_DIR/docker-compose.yml" down --remove-orphans 2>/dev/null || true
+  docker compose -f "$ROOT_DIR/docker-compose.yml" down --remove-orphans 2>/dev/null || true
 
 log_info "Removing stale containers if any..."
 for container in order-db payment-db notification-db rabbitmq; do
@@ -76,7 +76,7 @@ for container in order-db payment-db notification-db rabbitmq; do
 done
 
 log_info "Checking for port conflicts..."
-REQUIRED_PORTS="5432 5433 5434 5672 15672 3000 3001"
+REQUIRED_PORTS="25432 25433 25434 5672 15672 3000 3001"
 for port in $REQUIRED_PORTS; do
   container_id=$(docker ps -q --filter "publish=$port" 2>/dev/null || true)
   if [ -n "$container_id" ]; then
@@ -105,13 +105,13 @@ for port in $REQUIRED_PORTS; do
 done
 
 log_info "Starting Docker infrastructure..."
-docker-compose -f "$ROOT_DIR/docker-compose.yml" up -d --remove-orphans
+docker compose -f "$ROOT_DIR/docker-compose.yml" up -d --remove-orphans
 
 log_info "Waiting for infrastructure to be ready..."
 
-wait_for_port localhost 5432 "PostgreSQL (order-db)"
-wait_for_port localhost 5433 "PostgreSQL (payment-db)"
-wait_for_port localhost 5434 "PostgreSQL (notification-db)"
+wait_for_port localhost 25432 "PostgreSQL (order-db)"
+wait_for_port localhost 25433 "PostgreSQL (payment-db)"
+wait_for_port localhost 25434 "PostgreSQL (notification-db)"
 wait_for_port localhost 5672 "RabbitMQ (port)"
 
 log_info "Waiting for RabbitMQ broker to be fully ready..."
@@ -148,9 +148,9 @@ log_info "  Email Service:        RabbitMQ consumer (email_service_queue)"
 printf "\n"
 log_info "Infrastructure:"
 log_info "  RabbitMQ Management:  http://localhost:15672 (guest/guest)"
-log_info "  PostgreSQL (order):   localhost:5432"
-log_info "  PostgreSQL (payment): localhost:5433"
-log_info "  PostgreSQL (notif):   localhost:5434"
+log_info "  PostgreSQL (order):   localhost:25432"
+log_info "  PostgreSQL (payment): localhost:25433"
+log_info "  PostgreSQL (notif):   localhost:25434"
 printf "\n"
 log_info "Press Ctrl+C to stop all services"
 

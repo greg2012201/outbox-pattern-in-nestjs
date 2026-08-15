@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Payment } from '../entities';
 import { BaseRepository } from '@app/database';
+
+type FindByOrderIdOptions = {
+  orderId: string;
+  manager?: EntityManager;
+};
 
 @Injectable()
 export class PaymentRepository extends BaseRepository<Payment> {
@@ -13,8 +18,10 @@ export class PaymentRepository extends BaseRepository<Payment> {
     super(paymentRepository);
   }
 
-  async findByOrderId(orderId: string): Promise<Payment | null> {
-    return this.paymentRepository.findOne({
+  async findByOrderId({ orderId, manager }: FindByOrderIdOptions) {
+    const repository = manager?.getRepository(Payment) ?? this.paymentRepository;
+
+    return repository.findOne({
       where: { orderId },
     });
   }

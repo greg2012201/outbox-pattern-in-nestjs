@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: order_pass
       POSTGRES_DB: order_db
     ports:
-      - '5432:5432'
+      - '25432:5432'
     volumes:
       - order_db_data:/var/lib/postgresql/data
     networks:
@@ -23,7 +23,7 @@ services:
       POSTGRES_PASSWORD: payment_pass
       POSTGRES_DB: payment_db
     ports:
-      - '5433:5432'
+      - '25433:5432'
     volumes:
       - payment_db_data:/var/lib/postgresql/data
     networks:
@@ -37,7 +37,7 @@ services:
       POSTGRES_PASSWORD: notification_pass
       POSTGRES_DB: notification_db
     ports:
-      - '5434:5432'
+      - '25434:5432'
     volumes:
       - notification_db_data:/var/lib/postgresql/data
     networks:
