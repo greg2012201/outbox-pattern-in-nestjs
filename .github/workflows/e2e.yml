@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   testcontainers-e2e:
     runs-on: ubuntu-latest
