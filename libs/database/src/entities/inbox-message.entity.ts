@@ -10,6 +10,9 @@ export enum InboxMessageStatus {
 @Entity('inbox_messages')
 @Unique('uq_inbox_messages_message_consumer', ['messageId', 'consumerId'])
 @Index('idx_inbox_messages_status_lease', ['status', 'leaseExpiresAt'])
+@Index('idx_inbox_messages_ttl', ['receivedAt'], {
+  where: '"status" <> \'PROCESSING\'',
+})
 export class InboxMessage extends BaseEntity {
   @Column()
   messageId: string;
