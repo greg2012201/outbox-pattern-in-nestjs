@@ -21,6 +21,10 @@ export class PaymentCompletedNotificationHandler implements InboxMessageHandler<
     return message?.id;
   }
 
+  getBusinessId(message: PaymentCompletedMessage) {
+    return message?.businessId;
+  }
+
   handle({ message, manager }: PaymentCompletedWorkParameters) {
     return this.notificationService.createPendingNotification({
       manager,

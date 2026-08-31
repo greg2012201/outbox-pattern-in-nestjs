@@ -12,6 +12,7 @@ export type InboxMessageHandler<TMessage> = {
   consumerId: string;
   pattern: string;
   getMessageId: (message: TMessage) => string | undefined;
+  getBusinessId: (message: TMessage) => string | undefined;
   handle: (parameters: { message: TMessage; manager: EntityManager }) => Promise<unknown>;
 };
 
@@ -33,9 +34,12 @@ export class InboxMessageProcessor {
     handler,
   }: InboxMessageProcessorParameters<TMessage>) {
     const messageId = handler.getMessageId(message)?.trim();
+    const businessId = handler.getBusinessId(message)?.trim();
 
-    if (!messageId) {
-      this.logger.error(`Received ${handler.pattern} event without a valid message id`);
+    if (!messageId || !businessId) {
+      this.logger.error(
+        `Received ${handler.pattern} event without a valid message id or business id`
+      );
       delivery.nack(false);
       return;
     }
@@ -44,6 +48,7 @@ export class InboxMessageProcessor {
       const claim = await this.inboxService.claim({
         messageId,
         consumerId: handler.consumerId,
+        businessId,
         pattern: handler.pattern,
         payload: message as unknown as Record<string, unknown>,
       });

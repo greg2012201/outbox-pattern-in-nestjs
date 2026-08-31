@@ -19,6 +19,7 @@ export enum InboxClaimStatus {
 export type InboxClaimParameters = {
   messageId: string;
   consumerId: string;
+  businessId: string;
   pattern: string;
   payload: Record<string, any>;
   maxAttempts?: number;
@@ -88,6 +89,7 @@ export class InboxRepository {
   async claim({
     messageId,
     consumerId,
+    businessId,
     pattern,
     payload,
     maxAttempts: requestedMaxAttempts,
@@ -115,6 +117,7 @@ export class InboxRepository {
           id: uuid(),
           messageId,
           consumerId,
+          businessId,
           pattern,
           payload,
           status: InboxMessageStatus.PROCESSING,
@@ -134,6 +137,7 @@ export class InboxRepository {
         .createQueryBuilder('inboxMessage')
         .where('inboxMessage.messageId = :messageId', { messageId })
         .andWhere('inboxMessage.consumerId = :consumerId', { consumerId })
+        .andWhere('inboxMessage.businessId = :businessId', { businessId })
         .setLock('pessimistic_write')
         .getOne();
 

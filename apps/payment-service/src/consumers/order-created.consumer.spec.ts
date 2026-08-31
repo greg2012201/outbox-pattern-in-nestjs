@@ -12,6 +12,7 @@ describe('OrderCreatedConsumer', () => {
 
   const message = {
     id: 'event-123',
+    businessId: 'order-123',
     orderId: 'order-123',
     userId: 'user-123',
     totalAmount: 100,

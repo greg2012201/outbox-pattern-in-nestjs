@@ -12,6 +12,7 @@ describe('PaymentCompletedConsumer', () => {
 
   const message = {
     id: 'event-123',
+    businessId: 'payment-123',
     aggregateId: 'order-123',
     eventType: 'payment.completed',
     timestamp: new Date(),

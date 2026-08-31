@@ -12,11 +12,12 @@ describe('InboxMessageProcessor', () => {
     nack: jest.Mock;
   };
 
-  const message = { id: 'event-123', orderId: 'order-123' };
+  const message = { id: 'event-123', businessId: 'order-123', orderId: 'order-123' };
   const handler = {
     consumerId: 'notification-service',
     pattern: 'payment.paymentcompleted',
     getMessageId: (value: typeof message) => value.id,
+    getBusinessId: (value: typeof message) => value.businessId,
     handle: jest.fn(),
   };
 
@@ -78,6 +79,13 @@ describe('InboxMessageProcessor', () => {
 
       await sut.process({ message, delivery, handler });
 
+      expect(inboxService.claim).toHaveBeenCalledWith({
+        messageId: 'event-123',
+        consumerId: 'notification-service',
+        businessId: 'order-123',
+        pattern: 'payment.paymentcompleted',
+        payload: message,
+      });
       expect(inboxService.runInTransaction).toHaveBeenCalledWith({
         claim,
         work: expect.any(Function),

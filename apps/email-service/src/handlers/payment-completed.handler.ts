@@ -21,6 +21,10 @@ export class PaymentCompletedEmailHandler implements InboxMessageHandler<Payment
     return message?.id;
   }
 
+  getBusinessId(message: PaymentCompletedMessage) {
+    return message?.businessId;
+  }
+
   handle({ message, manager }: PaymentCompletedWorkParameters) {
     return this.emailService.createPendingEmail({
       manager,

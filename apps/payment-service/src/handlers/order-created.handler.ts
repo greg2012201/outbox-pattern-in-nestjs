@@ -5,6 +5,7 @@ import { PaymentService } from '../services/payment.service';
 
 export type OrderCreatedMessage = {
   id: string;
+  businessId: string;
   orderId: string;
   userId: string;
   totalAmount: number;
@@ -30,6 +31,10 @@ export class OrderCreatedHandler implements InboxMessageHandler<OrderCreatedMess
 
   getMessageId(message: OrderCreatedMessage) {
     return message?.id;
+  }
+
+  getBusinessId(message: OrderCreatedMessage) {
+    return message?.businessId;
   }
 
   handle({ message, manager }: OrderCreatedWorkParameters) {
