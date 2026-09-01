@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Notification } from '../entities';
 import { BaseRepository } from '@app/database';
+
+type CreateNotificationParams = {
+  manager: EntityManager;
+  data: Partial<Notification>;
+};
 
 @Injectable()
 export class NotificationRepository extends BaseRepository<Notification> {
@@ -20,9 +25,8 @@ export class NotificationRepository extends BaseRepository<Notification> {
     });
   }
 
-  async findByEventId(eventId: string): Promise<Notification | null> {
-    return this.notificationRepository.findOne({
-      where: { eventId },
-    });
+  async createNotification({ manager, data }: CreateNotificationParams) {
+    const repository = manager.getRepository(Notification);
+    return repository.save(repository.create(data));
   }
 }

@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Email } from '../entities';
 import { BaseRepository } from '@app/database';
+
+type SaveEmailParams = {
+  manager: EntityManager;
+  data: Partial<Email>;
+};
 
 @Injectable()
 export class EmailRepository extends BaseRepository<Email> {
@@ -13,16 +18,15 @@ export class EmailRepository extends BaseRepository<Email> {
     super(emailRepository);
   }
 
-  async findByOrderId(orderId: string): Promise<Email[]> {
+  async findByOrderId(orderId: string) {
     return this.emailRepository.find({
       where: { orderId },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findByEventId(eventId: string): Promise<Email | null> {
-    return this.emailRepository.findOne({
-      where: { eventId },
-    });
+  async saveEmail({ manager, data }: SaveEmailParams) {
+    const repository = manager.getRepository(Email);
+    return repository.save(repository.create(data));
   }
 }

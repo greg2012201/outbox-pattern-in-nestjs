@@ -9,7 +9,7 @@ dotenv.config({ path: '.env.email' });
 async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     EmailServiceModule,
-    getRabbitMQConfig({ queue: 'email_service_queue', noAck: true })
+    getRabbitMQConfig({ queue: 'email_service_queue', noAck: false })
   );
 
   await app.listen();

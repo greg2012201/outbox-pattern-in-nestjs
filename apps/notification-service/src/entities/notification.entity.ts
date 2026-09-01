@@ -18,8 +18,17 @@ export class Notification extends BaseEntity {
   @Column()
   orderId: string;
 
-  @Column()
-  eventId: string;
+  @Column({ nullable: true })
+  paymentId: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  amount: number;
+
+  @Column({ nullable: true })
+  currency: string;
+
+  @Column({ nullable: true })
+  transactionId: string;
 
   @Column({
     type: 'varchar',

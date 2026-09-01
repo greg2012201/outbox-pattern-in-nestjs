@@ -1,16 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Payment, PaymentAttempt, PaymentStatus } from '../entities';
 import { OutboxEvent } from '@app/database';
-import { PaymentDto } from '../dto/payment.dto';
 import { PaymentRepository } from '../repositories/payment.repository';
-import { PaymentAttemptRepository } from '../repositories/payment-attempt.repository';
 import { v4 as uuid } from 'uuid';
 
 type PaymentProviderRequest = {
   amount: number;
   currency: string;
+};
+
+type ProcessPaymentOptions = {
+  orderId: string;
+  amount: number;
+  currency: string;
+};
+
+type PaymentTransactionOptions = {
+  orderId: string;
+  amount: number;
+  currency: string;
+  manager: EntityManager;
 };
 
 @Injectable()
@@ -19,27 +29,63 @@ export class PaymentService {
 
   constructor(
     private readonly paymentRepository: PaymentRepository,
-    private readonly paymentAttemptRepository: PaymentAttemptRepository,
-    @InjectRepository(Payment)
-    private paymentsRepository: Repository<Payment>,
-    @InjectRepository(PaymentAttempt)
-    private paymentAttemptsRepository: Repository<PaymentAttempt>,
-    private dataSource: DataSource
+    private readonly dataSource: DataSource
   ) {}
 
-  async processPayment(orderId: string, amount: number, currency: string): Promise<PaymentDto> {
+  async processPayment({ orderId, amount, currency }: ProcessPaymentOptions) {
     const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    let transactionStarted = false;
 
     try {
-      const existingPayment = await this.paymentRepository.findByOrderId(orderId);
-      if (existingPayment) {
-        this.logger.warn(`Payment already exists for order ${orderId}`);
-        return this.mapToDto(existingPayment);
-      }
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      transactionStarted = true;
+      const result = await this.processPaymentInTransaction({
+        orderId,
+        amount,
+        currency,
+        manager: queryRunner.manager,
+      });
+      await queryRunner.commitTransaction();
 
-      const payment = queryRunner.manager.create(Payment, {
+      return result;
+    } catch (error) {
+      if (transactionStarted) {
+        await queryRunner.rollbackTransaction();
+      }
+      this.logger.error(`Error processing payment for order ${orderId}:`, error);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async getPaymentByOrderId(orderId: string) {
+    const payment = await this.paymentRepository.findByOrderId({ orderId });
+    if (!payment) {
+      return null;
+    }
+    return this.mapToDto(payment);
+  }
+
+  async processPaymentInTransaction({
+    orderId,
+    amount,
+    currency,
+    manager,
+  }: PaymentTransactionOptions) {
+    const existingPayment = await this.paymentRepository.findByOrderId({
+      orderId,
+      manager,
+    });
+
+    let finalPayment: Payment;
+
+    if (existingPayment) {
+      this.logger.warn(`Payment already exists for order ${orderId}`);
+      finalPayment = existingPayment;
+    } else {
+      const payment = manager.create(Payment, {
         id: uuid(),
         orderId,
         amount,
@@ -47,7 +93,7 @@ export class PaymentService {
         status: PaymentStatus.PROCESSING,
       });
 
-      const savedPayment = await queryRunner.manager.save(payment);
+      const savedPayment = await manager.save(payment);
 
       const paymentResult = await this.callPaymentProvider({ amount, currency });
 
@@ -59,10 +105,10 @@ export class PaymentService {
         updatedPayment.status = PaymentStatus.FAILED;
       }
 
-      const paymentUpdate = queryRunner.manager.create(Payment, updatedPayment);
-      const finalPayment = await queryRunner.manager.save(paymentUpdate);
+      const paymentUpdate = manager.create(Payment, updatedPayment);
+      finalPayment = await manager.save(paymentUpdate);
 
-      const outboxEvent = queryRunner.manager.create(OutboxEvent, {
+      const outboxEvent = manager.create(OutboxEvent, {
         id: uuid(),
         aggregateType: 'Payment',
         aggregateId: finalPayment.id,
@@ -82,36 +128,20 @@ export class PaymentService {
             },
       });
 
-      await queryRunner.manager.save(outboxEvent);
+      await manager.save(outboxEvent);
 
       if (!paymentResult.success) {
-        const attempt = queryRunner.manager.create(PaymentAttempt, {
+        const attempt = manager.create(PaymentAttempt, {
           id: uuid(),
           paymentId: finalPayment.id,
           attemptNumber: 1,
           errorMessage: paymentResult.error,
         });
-        await queryRunner.manager.save(attempt);
+        await manager.save(attempt);
       }
-
-      await queryRunner.commitTransaction();
-
-      return this.mapToDto(finalPayment);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      this.logger.error(`Error processing payment for order ${orderId}:`, error);
-      throw error;
-    } finally {
-      await queryRunner.release();
     }
-  }
 
-  async getPaymentByOrderId(orderId: string): Promise<PaymentDto | null> {
-    const payment = await this.paymentRepository.findByOrderId(orderId);
-    if (!payment) {
-      return null;
-    }
-    return this.mapToDto(payment);
+    return this.mapToDto(finalPayment);
   }
 
   private async callPaymentProvider({ amount, currency }: PaymentProviderRequest) {
@@ -140,7 +170,7 @@ export class PaymentService {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
 
-  private mapToDto(payment: Payment): PaymentDto {
+  private mapToDto(payment: Payment) {
     return {
       id: payment.id,
       orderId: payment.orderId,

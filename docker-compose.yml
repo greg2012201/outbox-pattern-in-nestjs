@@ -9,37 +9,84 @@ services:
       POSTGRES_PASSWORD: order_pass
       POSTGRES_DB: order_db
     ports:
-      - '5432:5432'
+      - '25432:5432'
     volumes:
       - order_db_data:/var/lib/postgresql/data
     networks:
       - payment-network
 
   postgres-payment:
-    image: postgres:15-alpine
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
     container_name: payment-db
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_cron
+      - -c
+      - cron.database_name=payment_db
+      - -c
+      - cron.use_background_workers=on
     environment:
       POSTGRES_USER: payment_user
       POSTGRES_PASSWORD: payment_pass
       POSTGRES_DB: payment_db
     ports:
-      - '5433:5432'
+      - '25433:5432'
     volumes:
       - payment_db_data:/var/lib/postgresql/data
+      - ./docker/postgres/init/01-pg-cron.sql:/docker-entrypoint-initdb.d/01-pg-cron.sql:ro
     networks:
       - payment-network
 
   postgres-notification:
-    image: postgres:15-alpine
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
     container_name: notification-db
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_cron
+      - -c
+      - cron.database_name=notification_db
+      - -c
+      - cron.use_background_workers=on
     environment:
       POSTGRES_USER: notification_user
       POSTGRES_PASSWORD: notification_pass
       POSTGRES_DB: notification_db
     ports:
-      - '5434:5432'
+      - '25434:5432'
     volumes:
       - notification_db_data:/var/lib/postgresql/data
+      - ./docker/postgres/init/01-pg-cron.sql:/docker-entrypoint-initdb.d/01-pg-cron.sql:ro
+    networks:
+      - payment-network
+
+  postgres-email:
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    container_name: email-db
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_cron
+      - -c
+      - cron.database_name=email_db
+      - -c
+      - cron.use_background_workers=on
+    environment:
+      POSTGRES_USER: email_user
+      POSTGRES_PASSWORD: email_pass
+      POSTGRES_DB: email_db
+    ports:
+      - '25435:5432'
+    volumes:
+      - email_db_data:/var/lib/postgresql/data
+      - ./docker/postgres/init/01-pg-cron.sql:/docker-entrypoint-initdb.d/01-pg-cron.sql:ro
     networks:
       - payment-network
 
@@ -67,6 +114,7 @@ volumes:
   order_db_data:
   payment_db_data:
   notification_db_data:
+  email_db_data:
   rabbitmq_data:
 
 networks:

@@ -1,122 +1,61 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { RmqContext } from '@nestjs/microservices';
+import { InboxMessageProcessor, RmqMessageDeliveryFactory } from '@app/messaging';
 import { OrderCreatedConsumer } from './order-created.consumer';
-import { PaymentService } from '../services/payment.service';
-import { ProcessedEventRepository } from '@app/messaging';
+import { OrderCreatedHandler } from '../handlers/order-created.handler';
 
 describe('OrderCreatedConsumer', () => {
-  let consumer: OrderCreatedConsumer;
-  let paymentService: PaymentService;
-  let processedEventRepository: ProcessedEventRepository;
+  let sut: OrderCreatedConsumer;
+  let inboxMessageProcessor: InboxMessageProcessor;
+  let rmqMessageDeliveryFactory: RmqMessageDeliveryFactory;
+  let orderCreatedHandler: OrderCreatedHandler;
+
+  const message = {
+    id: 'event-123',
+    businessId: 'order-123',
+    orderId: 'order-123',
+    userId: 'user-123',
+    totalAmount: 100,
+    currency: 'USD',
+    items: [],
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      controllers: [OrderCreatedConsumer],
       providers: [
-        OrderCreatedConsumer,
         {
-          provide: PaymentService,
-          useValue: {
-            processPayment: jest.fn(),
-          },
+          provide: InboxMessageProcessor,
+          useValue: { process: jest.fn() },
         },
         {
-          provide: ProcessedEventRepository,
-          useValue: {
-            findProcessedEvent: jest.fn(),
-            markAsProcessed: jest.fn(),
-          },
+          provide: OrderCreatedHandler,
+          useValue: {},
+        },
+        {
+          provide: RmqMessageDeliveryFactory,
+          useValue: { create: jest.fn() },
         },
       ],
     }).compile();
 
-    consumer = module.get<OrderCreatedConsumer>(OrderCreatedConsumer);
-    paymentService = module.get<PaymentService>(PaymentService);
-    processedEventRepository = module.get<ProcessedEventRepository>(ProcessedEventRepository);
+    sut = module.get<OrderCreatedConsumer>(OrderCreatedConsumer);
+    inboxMessageProcessor = module.get<InboxMessageProcessor>(InboxMessageProcessor);
+    orderCreatedHandler = module.get<OrderCreatedHandler>(OrderCreatedHandler);
+    rmqMessageDeliveryFactory = module.get<RmqMessageDeliveryFactory>(RmqMessageDeliveryFactory);
   });
 
-  it('should be defined', () => {
-    expect(consumer).toBeDefined();
-  });
+  it('delegates message processing to the inbox processor', async () => {
+    const context = {} as RmqContext;
+    const delivery = { ack: jest.fn(), nack: jest.fn() };
+    jest.spyOn(rmqMessageDeliveryFactory, 'create').mockReturnValue(delivery);
 
-  describe('handleOrderCreated', () => {
-    it('should process order created event', async () => {
-      const message = {
-        id: 'event-123',
-        orderId: 'order-123',
-        userId: 'user-123',
-        totalAmount: 100.0,
-        currency: 'USD',
-        items: [
-          {
-            productId: 'prod-1',
-            quantity: 2,
-            unitPrice: 50.0,
-          },
-        ],
-      };
+    await sut.handleOrderCreated(message, context);
 
-      jest.spyOn(processedEventRepository, 'findProcessedEvent').mockResolvedValue(null);
-      jest.spyOn(paymentService, 'processPayment').mockResolvedValue({
-        id: 'payment-123',
-        orderId: message.orderId,
-        amount: message.totalAmount,
-        currency: message.currency,
-        status: 'COMPLETED',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      jest.spyOn(processedEventRepository, 'markAsProcessed').mockResolvedValue();
-
-      await consumer.handleOrderCreated(message);
-
-      expect(paymentService.processPayment).toHaveBeenCalledWith(
-        message.orderId,
-        message.totalAmount,
-        message.currency
-      );
-      expect(processedEventRepository.markAsProcessed).toHaveBeenCalledWith(
-        message.id,
-        'payment-service'
-      );
-    });
-
-    it('should handle duplicate events idempotently', async () => {
-      const message = {
-        id: 'event-123',
-        orderId: 'order-123',
-        userId: 'user-123',
-        totalAmount: 100.0,
-        currency: 'USD',
-        items: [],
-      };
-
-      jest.spyOn(processedEventRepository, 'findProcessedEvent').mockResolvedValue({
-        eventId: message.id,
-        consumerId: 'payment-service',
-        processedAt: new Date(),
-      });
-
-      await consumer.handleOrderCreated(message);
-
-      expect(paymentService.processPayment).not.toHaveBeenCalled();
-    });
-
-    it('should handle payment service errors gracefully without throwing', async () => {
-      const message = {
-        id: 'event-123',
-        orderId: 'order-123',
-        userId: 'user-123',
-        totalAmount: 100.0,
-        currency: 'USD',
-        items: [],
-      };
-
-      jest.spyOn(processedEventRepository, 'findProcessedEvent').mockResolvedValue(null);
-      jest
-        .spyOn(paymentService, 'processPayment')
-        .mockRejectedValue(new Error('Payment processing failed'));
-
-      await expect(consumer.handleOrderCreated(message)).resolves.not.toThrow();
-      expect(processedEventRepository.markAsProcessed).not.toHaveBeenCalled();
+    expect(inboxMessageProcessor.process).toHaveBeenCalledWith({
+      message,
+      handler: orderCreatedHandler,
+      delivery,
     });
   });
 });

@@ -1,11 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { EntityManager } from 'typeorm';
 import { EmailService } from './email.service';
 import { EmailRepository } from '../repositories/email.repository';
 import { EmailStatus } from '../entities';
 
 describe('EmailService', () => {
-  let service: EmailService;
+  let sut: EmailService;
   let emailRepository: EmailRepository;
+
+  const manager = {} as EntityManager;
+  const params = {
+    manager,
+    orderId: 'order-123',
+    paymentId: 'payment-123',
+    amount: 100,
+    currency: 'USD',
+    transactionId: 'txn_123',
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -14,94 +25,122 @@ describe('EmailService', () => {
         {
           provide: EmailRepository,
           useValue: {
-            findByEventId: jest.fn(),
-            create: jest.fn(),
+            saveEmail: jest.fn(),
+            findById: jest.fn(),
             update: jest.fn(),
           },
         },
       ],
     }).compile();
 
-    service = module.get<EmailService>(EmailService);
+    sut = module.get<EmailService>(EmailService);
     emailRepository = module.get<EmailRepository>(EmailRepository);
-
-    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
-    expect(service).toBeDefined();
+    expect(sut).toBeDefined();
   });
 
-  describe('sendConfirmationEmail', () => {
-    const params = {
-      orderId: 'order-123',
-      eventId: 'event-123',
-      paymentId: 'payment-123',
-      amount: 100.0,
-      currency: 'USD',
-      transactionId: 'txn_123',
-    };
+  it('creates a pending email work item without delivering it', async () => {
+    const email = createEmail();
+    jest.spyOn(emailRepository, 'saveEmail').mockResolvedValue(email);
 
-    it('should create and send a confirmation email', async () => {
-      const mockEmail = {
-        id: 'email-123',
-        orderId: params.orderId,
-        eventId: params.eventId,
-        recipientEmail: `customer-${params.orderId}@example.com`,
-        subject: `Payment Confirmation - Order ${params.orderId} - ${params.amount} ${params.currency}`,
-        status: EmailStatus.PENDING,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        sentAt: null,
-      };
+    const result = await sut.createPendingEmail(params);
 
-      const sentEmail = {
-        ...mockEmail,
-        status: EmailStatus.SENT,
-        sentAt: new Date(),
-      };
-
-      jest.spyOn(emailRepository, 'findByEventId').mockResolvedValue(null);
-      jest.spyOn(emailRepository, 'create').mockResolvedValue(mockEmail);
-      jest.spyOn(emailRepository, 'update').mockResolvedValue(sentEmail);
-
-      const result = await service.sendConfirmationEmail(params);
-
-      expect(emailRepository.findByEventId).toHaveBeenCalledWith(params.eventId);
-      expect(emailRepository.create).toHaveBeenCalledWith({
+    expect(emailRepository.saveEmail).toHaveBeenCalledWith({
+      manager,
+      data: {
         id: expect.any(String),
         orderId: params.orderId,
-        eventId: params.eventId,
+        paymentId: params.paymentId,
+        amount: params.amount,
+        currency: params.currency,
+        transactionId: params.transactionId,
         recipientEmail: `customer-${params.orderId}@example.com`,
         subject: `Payment Confirmation - Order ${params.orderId} - ${params.amount} ${params.currency}`,
         status: EmailStatus.PENDING,
-      });
-      expect(emailRepository.update).toHaveBeenCalledWith(mockEmail.id, {
-        status: EmailStatus.SENT,
-        sentAt: expect.any(Date),
-      });
-      expect(result.status).toBe(EmailStatus.SENT);
+      },
     });
+    expect(result.status).toBe(EmailStatus.PENDING);
+  });
 
-    it('should return existing email if already processed', async () => {
-      const existingEmail = {
-        id: 'email-123',
-        orderId: params.orderId,
-        eventId: params.eventId,
-        recipientEmail: `customer-${params.orderId}@example.com`,
-        subject: 'Payment Confirmation',
-        status: EmailStatus.SENT,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        sentAt: new Date(),
-      };
+  it('delivers a pending email separately from work-item creation', async () => {
+    const email = createEmail();
+    const sentEmail = createEmail({ status: EmailStatus.SENT });
+    jest.spyOn(emailRepository, 'findById').mockResolvedValue(email);
+    jest.spyOn(emailRepository, 'update').mockResolvedValue(sentEmail);
 
-      jest.spyOn(emailRepository, 'findByEventId').mockResolvedValue(existingEmail);
+    const result = await sut.deliverEmail(email.id);
 
-      const result = await service.sendConfirmationEmail(params);
+    expect(emailRepository.update).toHaveBeenCalledWith(email.id, {
+      status: EmailStatus.SENT,
+      sentAt: expect.any(Date),
+    });
+    expect(result.status).toBe(EmailStatus.SENT);
+  });
 
-      expect(result.id).toBe(existingEmail.id);
-      expect(emailRepository.create).not.toHaveBeenCalled();
+  it('returns a sent email without sending it again', async () => {
+    const email = createEmail({ status: EmailStatus.SENT });
+    jest.spyOn(emailRepository, 'findById').mockResolvedValue(email);
+    const sendEmail = jest.fn();
+    (sut as unknown as EmailServicePrivateApi).sendEmail = sendEmail;
+
+    const result = await sut.deliverEmail(email.id);
+
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(emailRepository.update).not.toHaveBeenCalled();
+    expect(result.status).toBe(EmailStatus.SENT);
+  });
+
+  it('marks an email as failed when sending fails', async () => {
+    const email = createEmail();
+    const error = new Error('smtp unavailable');
+    jest.spyOn(emailRepository, 'findById').mockResolvedValue(email);
+    (sut as unknown as EmailServicePrivateApi).sendEmail = jest.fn().mockRejectedValue(error);
+
+    await expect(sut.deliverEmail(email.id)).rejects.toThrow(error);
+
+    expect(emailRepository.update).toHaveBeenCalledWith(email.id, {
+      status: EmailStatus.FAILED,
     });
   });
+
+  it('throws when the email does not exist', async () => {
+    jest.spyOn(emailRepository, 'findById').mockResolvedValue(null);
+
+    await expect(sut.deliverEmail('missing-email')).rejects.toThrow(
+      'Email missing-email not found'
+    );
+    expect(emailRepository.update).not.toHaveBeenCalled();
+  });
 });
+
+function createEmail(overrides: Partial<any> = {}) {
+  return {
+    id: 'email-123',
+    orderId: paramsForTest.orderId,
+    paymentId: paramsForTest.paymentId,
+    amount: paramsForTest.amount,
+    currency: paramsForTest.currency,
+    transactionId: paramsForTest.transactionId,
+    recipientEmail: `customer-${paramsForTest.orderId}@example.com`,
+    subject: `Payment Confirmation - Order ${paramsForTest.orderId} - ${paramsForTest.amount} ${paramsForTest.currency}`,
+    status: EmailStatus.PENDING,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    sentAt: null,
+    ...overrides,
+  };
+}
+
+const paramsForTest = {
+  orderId: 'order-123',
+  paymentId: 'payment-123',
+  amount: 100,
+  currency: 'USD',
+  transactionId: 'txn_123',
+};
+
+type EmailServicePrivateApi = {
+  sendEmail: jest.Mock;
+};

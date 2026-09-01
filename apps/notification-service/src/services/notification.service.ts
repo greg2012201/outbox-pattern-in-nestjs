@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 import { Notification, NotificationType, NotificationStatus } from '../entities';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { NotificationDto } from '../dto/notification.dto';
 import { v4 as uuid } from 'uuid';
 
-type SendNotificationParams = {
+type NotificationWorkItemParams = {
+  manager: EntityManager;
   orderId: string;
-  eventId: string;
   paymentId: string;
   amount: number;
   currency: string;
@@ -19,35 +20,48 @@ export class NotificationService {
 
   constructor(private readonly notificationRepository: NotificationRepository) {}
 
-  async sendNotification({
+  async createPendingNotification({
+    manager,
     orderId,
-    eventId,
     paymentId,
     amount,
     currency,
     transactionId,
-  }: SendNotificationParams): Promise<NotificationDto> {
-    const existingNotification = await this.notificationRepository.findByEventId(eventId);
-    if (existingNotification) {
-      this.logger.warn(`Notification already exists for event ${eventId}`);
-      return this.mapToDto(existingNotification);
-    }
-
-    const notification = await this.notificationRepository.create({
-      id: uuid(),
-      orderId,
-      eventId,
-      type: NotificationType.PUSH,
-      status: NotificationStatus.PENDING,
-    });
-
-    try {
-      await this.sendPushNotification({
+  }: NotificationWorkItemParams) {
+    const notification = await this.notificationRepository.createNotification({
+      manager,
+      data: {
+        id: uuid(),
         orderId,
         paymentId,
         amount,
         currency,
         transactionId,
+        type: NotificationType.PUSH,
+        status: NotificationStatus.PENDING,
+      },
+    });
+
+    return this.mapToDto(notification);
+  }
+
+  async deliverNotification(notificationId: string) {
+    const notification = await this.notificationRepository.findById(notificationId);
+    if (!notification) {
+      throw new Error(`Notification ${notificationId} not found`);
+    }
+
+    if (notification.status === NotificationStatus.SENT) {
+      return this.mapToDto(notification);
+    }
+
+    try {
+      await this.sendPushNotification({
+        orderId: notification.orderId,
+        paymentId: notification.paymentId,
+        amount: notification.amount,
+        currency: notification.currency,
+        transactionId: notification.transactionId,
       });
 
       const updatedNotification = await this.notificationRepository.update(notification.id, {
@@ -55,7 +69,7 @@ export class NotificationService {
         sentAt: new Date(),
       });
 
-      this.logger.log(`Push notification sent for order ${orderId}`);
+      this.logger.log(`Push notification sent for order ${notification.orderId}`);
 
       return this.mapToDto(updatedNotification!);
     } catch (error) {
@@ -63,7 +77,10 @@ export class NotificationService {
         status: NotificationStatus.FAILED,
       });
 
-      this.logger.error(`Failed to send push notification for order ${orderId}:`, error);
+      this.logger.error(
+        `Failed to send push notification for order ${notification.orderId}:`,
+        error
+      );
       throw error;
     }
   }
@@ -84,7 +101,6 @@ export class NotificationService {
     return {
       id: notification.id,
       orderId: notification.orderId,
-      eventId: notification.eventId,
       type: notification.type,
       status: notification.status,
       createdAt: notification.createdAt,

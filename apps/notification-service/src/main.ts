@@ -9,7 +9,7 @@ dotenv.config({ path: '.env.notification' });
 async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     NotificationServiceModule,
-    getRabbitMQConfig({ queue: 'notification_service_queue', noAck: true })
+    getRabbitMQConfig({ queue: 'notification_service_queue', noAck: false })
   );
 
   await app.listen();

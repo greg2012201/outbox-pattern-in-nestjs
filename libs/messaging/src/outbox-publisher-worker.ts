@@ -42,6 +42,7 @@ export class OutboxPublisherWorker {
           const message = {
             id: event.id,
             ...event.payload,
+            businessId: event.aggregateId,
           };
 
           await this.messagePublisher.publish(pattern, message);

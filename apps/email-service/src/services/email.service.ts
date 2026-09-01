@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 import { Email, EmailStatus } from '../entities';
 import { EmailRepository } from '../repositories/email.repository';
-import { EmailDto } from '../dto/email.dto';
 import { v4 as uuid } from 'uuid';
 
-type SendEmailParams = {
+type EmailWorkItemParams = {
+  manager: EntityManager;
   orderId: string;
-  eventId: string;
   paymentId: string;
   amount: number;
   currency: string;
@@ -19,41 +19,54 @@ export class EmailService {
 
   constructor(private readonly emailRepository: EmailRepository) {}
 
-  async sendConfirmationEmail({
+  async createPendingEmail({
+    manager,
     orderId,
-    eventId,
     paymentId,
     amount,
     currency,
     transactionId,
-  }: SendEmailParams): Promise<EmailDto> {
-    const existingEmail = await this.emailRepository.findByEventId(eventId);
-    if (existingEmail) {
-      this.logger.warn(`Email already exists for event ${eventId}`);
-      return this.mapToDto(existingEmail);
-    }
-
+  }: EmailWorkItemParams) {
     const subject = this.renderSubject({ orderId, amount, currency });
     const recipientEmail = this.resolveRecipientEmail(orderId);
 
-    const email = await this.emailRepository.create({
-      id: uuid(),
-      orderId,
-      eventId,
-      recipientEmail,
-      subject,
-      status: EmailStatus.PENDING,
-    });
-
-    try {
-      await this.sendEmail({
-        recipientEmail,
-        subject,
+    const email = await this.emailRepository.saveEmail({
+      manager,
+      data: {
+        id: uuid(),
         orderId,
         paymentId,
         amount,
         currency,
         transactionId,
+        recipientEmail,
+        subject,
+        status: EmailStatus.PENDING,
+      },
+    });
+
+    return this.mapToDto(email);
+  }
+
+  async deliverEmail(emailId: string) {
+    const email = await this.emailRepository.findById(emailId);
+    if (!email) {
+      throw new Error(`Email ${emailId} not found`);
+    }
+
+    if (email.status === EmailStatus.SENT) {
+      return this.mapToDto(email);
+    }
+
+    try {
+      await this.sendEmail({
+        recipientEmail: email.recipientEmail,
+        subject: email.subject,
+        orderId: email.orderId,
+        paymentId: email.paymentId,
+        amount: email.amount,
+        currency: email.currency,
+        transactionId: email.transactionId,
       });
 
       const updatedEmail = await this.emailRepository.update(email.id, {
@@ -61,7 +74,9 @@ export class EmailService {
         sentAt: new Date(),
       });
 
-      this.logger.log(`Confirmation email sent for order ${orderId} to ${recipientEmail}`);
+      this.logger.log(
+        `Confirmation email sent for order ${email.orderId} to ${email.recipientEmail}`
+      );
 
       return this.mapToDto(updatedEmail!);
     } catch (error) {
@@ -69,7 +84,7 @@ export class EmailService {
         status: EmailStatus.FAILED,
       });
 
-      this.logger.error(`Failed to send confirmation email for order ${orderId}:`, error);
+      this.logger.error(`Failed to send confirmation email for order ${email.orderId}:`, error);
       throw error;
     }
   }
@@ -126,11 +141,10 @@ export class EmailService {
     ].join('\n');
   }
 
-  private mapToDto(email: Email): EmailDto {
+  private mapToDto(email: Email) {
     return {
       id: email.id,
       orderId: email.orderId,
-      eventId: email.eventId,
       recipientEmail: email.recipientEmail,
       subject: email.subject,
       status: email.status,
