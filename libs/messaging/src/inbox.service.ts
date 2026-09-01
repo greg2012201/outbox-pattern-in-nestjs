@@ -1,15 +1,16 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { v4 as uuid } from 'uuid';
+import { InboxMessageStatus } from '@app/database';
 import {
   DEFAULT_INBOX_LEASE_DURATION_MS,
   DEFAULT_INBOX_MAX_ATTEMPTS,
-  DEFAULT_INBOX_RECOVERY_BATCH_SIZE,
   InboxClaimParameters,
+  InboxClaimResult,
   InboxMarkFailedParameters,
   InboxMarkProcessedParameters,
-  InboxRecoverExpiredParameters,
   InboxRepository,
-  InboxClaimResult,
+  InboxClaimStatus,
 } from './inbox.repository';
 
 export type InboxServiceOptions = {
@@ -21,6 +22,16 @@ export type InboxServiceOptions = {
 export type InboxTransactionParameters<T> = {
   claim: InboxClaimResult;
   work: (manager: EntityManager) => Promise<T>;
+};
+
+type PositiveIntegerParameters = {
+  value: number | undefined;
+  fallback: number;
+};
+
+type ActiveLeaseParameters = {
+  leaseExpiresAt: Date | null;
+  now: Date;
 };
 
 @Injectable()
@@ -36,18 +47,115 @@ export class InboxService {
   ) {}
 
   async claim(parameters: InboxClaimParameters) {
-    return this.inboxRepository.claim({
-      ...parameters,
-      maxAttempts:
-        parameters.maxAttempts ??
-        this.options?.maxAttempts ??
-        this.getEnvironmentNumber('INBOX_MAX_ATTEMPTS') ??
-        DEFAULT_INBOX_MAX_ATTEMPTS,
-      leaseDurationMs:
-        parameters.leaseDurationMs ??
-        this.options?.leaseDurationMs ??
-        this.getEnvironmentNumber('INBOX_LEASE_DURATION_MS') ??
-        DEFAULT_INBOX_LEASE_DURATION_MS,
+    const maxAttempts = this.getMaxAttempts(parameters.maxAttempts);
+    const leaseDurationMs = this.getLeaseDuration(parameters.leaseDurationMs);
+    const claimToken = uuid();
+
+    return this.inboxRepository.withClaimTransaction({
+      messageId: parameters.messageId,
+      consumerId: parameters.consumerId,
+      businessId: parameters.businessId,
+      pattern: parameters.pattern,
+      payload: parameters.payload,
+      claimToken,
+      leaseDurationMs,
+      work: async ({ manager, message, now, leaseExpiresAt }) => {
+        if (message.claimToken === claimToken) {
+          return {
+            status: InboxClaimStatus.CLAIMED,
+            message,
+            claimToken,
+          };
+        }
+
+        if (message.status === InboxMessageStatus.PROCESSED) {
+          return {
+            status: InboxClaimStatus.PROCESSED,
+            message,
+            claimToken: null,
+          };
+        }
+
+        if (
+          message.status === InboxMessageStatus.PROCESSING &&
+          this.hasActiveLease({ leaseExpiresAt: message.leaseExpiresAt, now })
+        ) {
+          return {
+            status: InboxClaimStatus.IN_FLIGHT,
+            message,
+            claimToken: null,
+          };
+        }
+
+        if (
+          message.status === InboxMessageStatus.FAILED &&
+          (message.attemptCount ?? 0) > maxAttempts
+        ) {
+          return {
+            status: InboxClaimStatus.EXHAUSTED,
+            message,
+            claimToken: null,
+          };
+        }
+
+        const nextAttemptCount =
+          message.status === InboxMessageStatus.FAILED
+            ? message.attemptCount
+            : (message.attemptCount ?? 0) + 1;
+
+        if (nextAttemptCount > maxAttempts) {
+          await this.inboxRepository.updateMessage({
+            manager,
+            id: message.id,
+            values: {
+              status: InboxMessageStatus.FAILED,
+              attemptCount: nextAttemptCount,
+              processingStartedAt: null,
+              leaseExpiresAt: null,
+              claimToken: null,
+              lastError: 'Processing lease expired',
+            },
+          });
+
+          message.status = InboxMessageStatus.FAILED;
+          message.attemptCount = nextAttemptCount;
+          message.processingStartedAt = null;
+          message.leaseExpiresAt = null;
+          message.claimToken = null;
+
+          return {
+            status: InboxClaimStatus.EXHAUSTED,
+            message,
+            claimToken: null,
+          };
+        }
+
+        await this.inboxRepository.updateMessage({
+          manager,
+          id: message.id,
+          values: {
+            status: InboxMessageStatus.PROCESSING,
+            attemptCount: nextAttemptCount,
+            processingStartedAt: now,
+            leaseExpiresAt,
+            claimToken,
+            lastError: null,
+            processedAt: null,
+          },
+        });
+
+        message.status = InboxMessageStatus.PROCESSING;
+        message.attemptCount = nextAttemptCount;
+        message.processingStartedAt = now;
+        message.leaseExpiresAt = leaseExpiresAt;
+        message.claimToken = claimToken;
+
+        return {
+          status: InboxClaimStatus.RETRYABLE,
+          message,
+          claimToken,
+        };
+      },
     });
   }
 
@@ -96,15 +204,37 @@ export class InboxService {
     }
   }
 
-  async recoverExpired(parameters: InboxRecoverExpiredParameters = {}) {
-    return this.inboxRepository.recoverExpired({
-      ...parameters,
-      limit:
-        parameters.limit ??
-        this.options?.recoveryBatchSize ??
-        this.getEnvironmentNumber('INBOX_RECOVERY_BATCH_SIZE') ??
-        DEFAULT_INBOX_RECOVERY_BATCH_SIZE,
+  private getMaxAttempts(value: number | undefined) {
+    return this.getPositiveInteger({
+      value: value ?? this.options?.maxAttempts ?? this.getEnvironmentNumber('INBOX_MAX_ATTEMPTS'),
+      fallback: DEFAULT_INBOX_MAX_ATTEMPTS,
     });
+  }
+
+  private getLeaseDuration(value: number | undefined) {
+    return this.getPositiveInteger({
+      value:
+        value ??
+        this.options?.leaseDurationMs ??
+        this.getEnvironmentNumber('INBOX_LEASE_DURATION_MS'),
+      fallback: DEFAULT_INBOX_LEASE_DURATION_MS,
+    });
+  }
+
+  private getPositiveInteger({ value, fallback }: PositiveIntegerParameters) {
+    if (value === undefined) {
+      return fallback;
+    }
+
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error('Inbox numeric options must be positive integers');
+    }
+
+    return value;
+  }
+
+  private hasActiveLease({ leaseExpiresAt, now }: ActiveLeaseParameters) {
+    return leaseExpiresAt !== null && leaseExpiresAt.getTime() > now.getTime();
   }
 
   private getEnvironmentNumber(name: string) {
